@@ -11,4 +11,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        console: fileURLToPath(new URL('./console/index.html', import.meta.url)),
+      },
+    },
+  },
+  server: {
+    proxy: {
+      '/api': process.env.API_URL ?? 'http://localhost:8000',
+    },
+  },
 })

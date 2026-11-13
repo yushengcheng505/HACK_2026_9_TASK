@@ -1,0 +1,260 @@
+@import './index.css';
+
+/* Пульт: те же токены «Стаи» + цвета состояний. Красный — только ошибки и пробелы, янтарь — предупреждения. */
+@theme {
+  --color-hazard: #ff5a4e;
+  --color-hazard-deep: #4a1512;
+  --color-amber: #f4b942;
+  --color-amber-deep: #3d2c0b;
+  --color-grid: #06201b;
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: var(--color-ink);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+
+  :is(textarea, select, [role='button']):focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Чертёжная сетка подложки */
+  .bp-grid {
+    background-color: var(--color-ink);
+    background-image:
+      linear-gradient(var(--color-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-grid) 1px, transparent 1px),
+      linear-gradient(rgb(15 59 50 / 0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(15 59 50 / 0.35) 1px, transparent 1px);
+    background-size:
+      24px 24px,
+      24px 24px,
+      120px 120px,
+      120px 120px;
+    background-position: -1px -1px;
+  }
+
+  /* Подпись-метка: моноширинный капс с разрядкой */
+  .tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* Нажимаемое: отклик на нажатие */
+  .press {
+    transition:
+      transform 140ms var(--ease-out-strong),
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      opacity 160ms ease;
+  }
+
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Уголки-«засечки» чертежа у панели */
+  .ticks {
+    position: relative;
+  }
+
+  .ticks::before,
+  .ticks::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    pointer-events: none;
+    border-color: var(--color-brand-mid);
+  }
+
+  .ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid;
+    border-left: 1px solid;
+  }
+
+  .ticks::after {
+    right: -1px;
+    bottom: -1px;
+    border-right: 1px solid;
+    border-bottom: 1px solid;
+  }
+
+  .glow-brand {
+    box-shadow:
+      0 0 0 1px rgb(1 222 130 / 0.55),
+      0 0 18px rgb(1 222 130 / 0.18);
+  }
+
+  .glow-hazard {
+    box-shadow:
+      0 0 0 1px rgb(255 90 78 / 0.7),
+      0 0 18px rgb(255 90 78 / 0.2);
+  }
+}
+
+/* ---------- движение ---------- */
+
+.fx-enter {
+  animation: fx-enter 240ms var(--ease-out-strong) backwards;
+}
+
+.fx-retire {
+  animation: fx-retire 420ms ease both;
+}
+
+.fx-pulse {
+  animation: fx-pulse 1.4s ease-out infinite;
+}
+
+.fx-pulse-amber {
+  animation: fx-pulse-amber 1.4s ease-out infinite;
+}
+
+.fx-beam {
+  animation: fx-beam 1.6s linear infinite;
+}
+
+.fx-draw {
+  stroke-dasharray: var(--len, 600);
+  stroke-dashoffset: var(--len, 600);
+  animation: fx-draw 560ms var(--ease-out-strong) forwards;
+}
+
+.fx-flow {
+  stroke-dasharray: 3 9;
+  animation: fx-flow 0.9s linear infinite;
+}
+
+.fx-scan {
+  animation: fx-scan 2.4s linear infinite;
+}
+
+.fx-blink {
+  animation: fx-blink 1s steps(1) infinite;
+}
+
+@keyframes fx-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fx-retire {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.28;
+  }
+}
+
+@keyframes fx-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(1 222 130 / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgb(1 222 130 / 0);
+  }
+}
+
+@keyframes fx-pulse-amber {
+  0% {
+    box-shadow: 0 0 0 0 rgb(244 185 66 / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgb(244 185 66 / 0);
+  }
+}
+
+@keyframes fx-beam {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+@keyframes fx-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fx-flow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@keyframes fx-scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes fx-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-enter,
+  .fx-retire {
+    animation-duration: 1ms;
+  }
+
+  .fx-pulse,
+  .fx-pulse-amber,
+  .fx-beam,
+  .fx-flow,
+  .fx-scan,
+  .fx-blink {
+    animation: none;
+  }
+
+  .fx-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

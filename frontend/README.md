@@ -12,6 +12,19 @@ npm run preview  # отдать собранный dist/
 
 Отладка анимации: `http://localhost:5173/?t=8.5` останавливает прогон на 8.5 секунде.
 
+## Пульт декомпозиции — `/console/`
+
+Вторая страница (отдельная точка входа Vite) для работы с агентом из `../backend`. Лендинг `/` от неё не зависит.
+Dev-сервер проксирует `/api` на бэкенд `http://localhost:8000` (другой адрес — `API_URL=... npm run dev`).
+
+```bash
+cd ../backend && uv run uvicorn app.main:app --port 8000   # бэкенд
+npm run dev                                               # http://localhost:5173/console/
+```
+
+Маршруты в хеше: `#/` — запуск, `#/runs` — журнал, `#/run/<id>` — прогон (карта, таблица, ОТК, пробелы).
+Дизайн и контракт событий: `../docs/superpowers/specs/2026-11-14-console-design.md`.
+
 ## Структура
 
 Слои импортируют только «вниз»: `app → pages → widgets → features → entities → shared`.
@@ -19,8 +32,9 @@ npm run preview  # отдать собранный dist/
 
 ```
 src/
-  app/                 точка сборки: App, глобальные стили и дизайн-токены (styles/index.css)
+  app/                 точки сборки: App (лендинг), ConsoleApp (пульт); стили: index.css, console.css
   pages/home/          главная страница — только компоновка виджетов
+  pages/console/       пульт: маршрутизация по хешу
   widgets/
     site-header/       шапка и навигация
     hero/              заголовок страницы
@@ -30,6 +44,16 @@ src/
       ui/scene/        SVG-сцена: orchestrator/, agents/ (по файлу на робота), маршруты, самолётики
     run-result/        блок «Финальный результат»: карточки агентов, статус, итог
     site-footer/
+    console-shell/     пульт: боковая панель, статус модели и контура
+    launch-panel/      галерея демо-эпиков и форма своего эпика
+    runs-list/         журнал запусков
+    run-workspace/     экран прогона — компоновка виджетов ниже
+    run-header/ run-metrics/ pipeline-rail/   шапка, метрики, рельс конвейера с петлёй критика
+    trace-map/         трассировочная карта: источники → требования → истории → задачи, связи в SVG
+    inspector/         выбранный узел, его обоснование и текст источника
+    telemetry/         поток модели и журнал событий
+    questions-panel/   вопросы аналитика, когда граф на паузе
+    results-table/ qc-report/ gaps-board/     вкладки: правка, ОТК, пробелы
   features/
     team-run/          логика прогона без отрисовки
       model/timeline.ts        все тайминги
@@ -37,7 +61,10 @@ src/
       model/computeRunFrame.ts чистая функция time → состояние страницы
       model/useTeamRun.ts      хук: часы + задача + кадр
     export-result/     кнопки «Скопировать» и «Скачать .md»
+    run-stream/        поток SSE прогона → модель (пачки событий раз в кадр)
+    launch-run/ answer-questions/ edit-result/   запуск, ответы аналитику, правки результата
   entities/agent/      агенты: типы, список, аватар
+  entities/run/        прогон: типы событий и результата, редьюсер applyEvent, цепочки прослеживаемости
   shared/              палитра для SVG, математика кривых, печать текста, Button, Caret, LogoMark
 ```
 
@@ -49,3 +76,5 @@ src/
 - Не так нарисован конкретный агент — `widgets/agent-stage/ui/scene/agents/<Name>Bot.tsx`.
   В DOM у групп есть атрибуты `data-agent` и `data-layer`.
 - Цвета: токены Tailwind в `app/styles/index.css`, копия для SVG — `shared/config/palette.ts`.
+- Пульт показывает не то, что прислал бэкенд — `entities/run/model/applyEvent.ts` (чистая функция
+  `applyEvent(view, event)`); связи и подсветка цепочки — `entities/run/model/trace.ts`.

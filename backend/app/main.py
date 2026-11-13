@@ -164,7 +164,7 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         return Response(render(result), media_type=media, headers={"Content-Disposition": disposition})
 
     @app.get("/api/runs/{run_id}/events")
-    async def events(run_id: str, replay: bool = False, after: int = 0,
+    async def events(run_id: str, replay: bool = False, speed: float = 1.0, after: int = 0,
                      last_event_id: str | None = Header(default=None)):
         get_run_or_404(run_id)
         after = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
@@ -178,7 +178,7 @@ def create_app(llm: LLM | None = None) -> FastAPI:
                 last, prev_ts = after, None
                 for e in store().events(run_id, after):
                     if replay and prev_ts is not None:
-                        await asyncio.sleep(min(e.ts - prev_ts, REPLAY_MAX_PAUSE))
+                        await asyncio.sleep(min((e.ts - prev_ts) / max(speed, 0.1), REPLAY_MAX_PAUSE))
                     prev_ts = e.ts
                     last = e.seq
                     yield fmt(e)

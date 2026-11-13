@@ -60,6 +60,8 @@ def test_demo_run_to_exports(client):
 
     tail = read_sse(client, f"/api/runs/{run_id}/events?after={len(events) - 1}")
     assert [t for t, _ in tail] == ["run_finished"]
+    replayed = read_sse(client, f"/api/runs/{run_id}/events?replay=1&speed=50")
+    assert [t for t, _ in replayed] == types
 
     data = client.get(f"/api/runs/{run_id}/export/json")
     assert data.json()["stats"]["stories_count"] == 2

@@ -156,7 +156,8 @@ async def parse_inputs_node(state: State) -> State:
     emit("node_started", node="parse_inputs", label="Разбор входов")
     sources = parse_inputs(state["epic_text"], decode_files(state.get("files", [])))
     emit("sources_parsed",
-         sources=[{"id": s.id, "kind": s.kind, "file": s.file, "title": s.title} for s in sources],
+         sources=[{"id": s.id, "kind": s.kind, "file": s.file, "title": s.title, "excerpt": s.text[:600]}
+                  for s in sources],
          contract_ops=[s.id for s in sources if s.kind in ("proto_rpc", "openapi_op")])
     emit("node_finished", node="parse_inputs", label="Разбор входов", summary=f"Фрагментов: {len(sources)}")
     return {"sources": [s.model_dump() for s in sources], "critic_round": 0, "redo": {}, "assumptions": []}

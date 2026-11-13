@@ -52,6 +52,9 @@ async def test_full_run_with_assumptions_and_critic_loop():
 
     types = [e["type"] for e in events]
     assert types[0] == "node_started"
+    parsed = next(e["data"] for e in events if e["type"] == "sources_parsed")
+    assert "Каждый вызов" in next(s["excerpt"] for s in parsed["sources"]
+                                  if s["id"] == "PROTO:CourierService.CreateShipment")
     for t in ("sources_parsed", "language_detected", "requirement_created", "gap_found", "questions_asked",
               "answers_received", "story_created", "task_created", "tasks_replaced", "checks_finished",
               "critic_feedback", "token", "run_finished"):

@@ -108,13 +108,14 @@ demo/<id>/            epic.md, docs/product/, docs/external/, contracts/, exampl
 ## Контракт событий SSE
 `GET /api/runs/{id}/events` отдаёт `id: <seq>`, `event: <type>`, `data: <json>`.
 Сначала все сохранённые события (с `Last-Event-ID` — после него), затем живые.
-`?replay=1` — проигрывание сохранённых событий с исходными паузами (не больше 2 с).
+`?replay=1` — проигрывание сохранённых событий с исходными паузами (не больше 2 с);
+`&speed=4` ускоряет проигрывание.
 
 | type | data |
 |---|---|
 | `run_started` | `{run_id, epic: {title}, model}` |
 | `node_started` / `node_finished` | `{node, label}` / `{node, label, summary}` |
-| `sources_parsed` | `{sources: [{id, kind, file, title}], contract_ops: [id]}` |
+| `sources_parsed` | `{sources: [{id, kind, file, title, excerpt}], contract_ops: [id]}` |
 | `language_detected` | `{value, confidence, evidence}` |
 | `token` | `{node, kind: content\|reasoning, text}`; для задач `node` = `tasks:US-001` |
 | `requirement_created` | `{requirement}` |
