@@ -1,0 +1,10 @@
+{
+  "title": "Интеграция с курьерской службой «Курьер-Экспресс»",
+  "summary": "Online Boutique (Go, gRPC) подключает внешнюю службу доставки: расчёт, отправления, отмена, отслеживание.",
+  "files": {
+    "product_docs": ["docs/product/online-boutique.md"],
+    "external_docs": ["docs/external/courier-api-guide.md"],
+    "contracts": ["contracts/courier.proto", "contracts/courier-tracking.yaml", "contracts/shipping.proto"],
+    "examples": ["examples/shipping_client.go"]
+  }
+}

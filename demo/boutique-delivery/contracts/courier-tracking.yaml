@@ -1,0 +1,52 @@
+openapi: 3.0.3
+info:
+  title: Курьер-Экспресс — отслеживание отправлений
+  version: 1.0.0
+servers:
+  - url: https://api.courier-express.example
+paths:
+  /v1/shipments/{shipment_id}/status:
+    get:
+      operationId: getShipmentStatus
+      summary: Текущий статус отправления
+      parameters:
+        - name: shipment_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Статус
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [CREATED, HANDED_TO_COURIER, IN_TRANSIT, DELIVERED, CANCELLED, LOST]
+                  updated_at: {type: string, format: date-time}
+        "404":
+          description: Отправление не найдено
+  /v1/shipments/{shipment_id}/events:
+    get:
+      operationId: listShipmentEvents
+      summary: История статусов отправления
+      parameters:
+        - name: shipment_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: События
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    status: {type: string}
+                    at: {type: string, format: date-time}
+                    comment: {type: string}

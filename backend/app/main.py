@@ -1,0 +1,208 @@
+import asyncio
+import json
+import uuid
+from contextlib import asynccontextmanager
+from urllib.parse import quote, urlparse
+
+import aiosqlite
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, StreamingResponse
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from pydantic import BaseModel
+
+from app.checks import compute_stats, run_checks
+from app.config import get_settings
+from app.demos import list_demos, load_demo
+from app.exporters import to_docx, to_json, to_xlsx
+from app.graph import build_graph, encode_files
+from app.llm import LLM, OpenAICompatLLM
+from app.runner import Runner
+from app.schemas import Decomposition, Source
+from app.sources import InputFile
+from app.store import TERMINAL, Store
+
+EXPORTS = {
+    "json": ("application/json", to_json),
+    "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", to_xlsx),
+    "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", to_docx),
+}
+REPLAY_MAX_PAUSE = 2.0
+SSE_PING = 15.0
+
+
+class DemoRunRequest(BaseModel):
+    skip_questions: bool = False
+
+
+class AnswersRequest(BaseModel):
+    answers: dict[str, str] = {}
+
+
+def create_app(llm: LLM | None = None) -> FastAPI:
+    settings = get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        store = Store(settings.data_dir / "app.db")
+        store.fail_interrupted()
+        async with aiosqlite.connect(settings.data_dir / "checkpoints.db") as conn:
+            graph = build_graph(AsyncSqliteSaver(conn))
+            app.state.store = store
+            app.state.runner = Runner(store, graph, llm or OpenAICompatLLM(settings))
+            yield
+            for task in list(app.state.runner.tasks.values()):
+                task.cancel()
+
+    app = FastAPI(title="Агент-декомпозитор", lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"],
+                       allow_headers=["*"])
+
+    def runner() -> Runner:
+        return app.state.runner
+
+    def store() -> Store:
+        return app.state.store
+
+    def get_run_or_404(run_id: str) -> dict:
+        run = store().get_run(run_id)
+        if run is None:
+            raise HTTPException(404, "Запуск не найден")
+        return run
+
+    def start(title: str, text: str, files: list[InputFile], skip: bool, origin: str, demo_id: str | None) -> dict:
+        if not text.strip():
+            raise HTTPException(422, "Текст эпика пуст")
+        run_id = uuid.uuid4().hex[:12]
+        store().create_run(run_id, title, origin, demo_id, skip)
+        runner().start(run_id, {"title": title, "epic_text": text, "files": encode_files(files),
+                                "skip_questions": skip})
+        return {"run_id": run_id}
+
+    @app.get("/api/health")
+    def health():
+        return {"status": "ok", "model": runner().llm.model, "llm_host": urlparse(settings.llm_base_url).netloc,
+                "json_mode": settings.llm_json_mode}
+
+    @app.get("/api/demos")
+    def demos():
+        return [{"id": d.id, "title": d.title, "summary": d.summary, "epic_text": d.epic_text,
+                 "files": [{"name": f.name, "role": f.role} for f in d.files]} for d in list_demos()]
+
+    @app.post("/api/demos/{demo_id}/run")
+    async def run_demo(demo_id: str, body: DemoRunRequest = Body(default=DemoRunRequest())):
+        try:
+            demo = load_demo(demo_id)
+        except FileNotFoundError:
+            raise HTTPException(404, "Демо не найдено")
+        return start(demo.title, demo.epic_text, demo.files, body.skip_questions, "demo", demo_id)
+
+    @app.post("/api/runs")
+    async def create_run(
+        title: str = Form(...),
+        text: str = Form(...),
+        skip_questions: bool = Form(False),
+        product_docs: list[UploadFile] = File(default=[]),
+        external_docs: list[UploadFile] = File(default=[]),
+        contracts: list[UploadFile] = File(default=[]),
+        examples: list[UploadFile] = File(default=[]),
+    ):
+        files = []
+        for role, uploads in (("product_docs", product_docs), ("external_docs", external_docs),
+                              ("contracts", contracts), ("examples", examples)):
+            for u in uploads:
+                if (u.filename or "").lower().endswith(".pdf"):
+                    raise HTTPException(422, f"PDF не поддерживается: {u.filename}")
+                files.append(InputFile(name=u.filename or "file", role=role, content=await u.read()))
+        return start(title, text, files, skip_questions, "ui", None)
+
+    @app.get("/api/runs")
+    def runs():
+        return [{k: r[k] for k in ("id", "title", "status", "origin", "demo_id", "created_at", "model")}
+                | {"stats": (r.get("result") or {}).get("stats")} for r in store().list_runs()]
+
+    @app.get("/api/runs/{run_id}")
+    def get_run(run_id: str):
+        return get_run_or_404(run_id)
+
+    @app.post("/api/runs/{run_id}/answers")
+    async def answer(run_id: str, body: AnswersRequest):
+        run = get_run_or_404(run_id)
+        if run["status"] != "waiting_answers":
+            raise HTTPException(409, "Запуск не ждёт ответов")
+        runner().resume(run_id, body.answers)
+        return {"status": "running"}
+
+    @app.put("/api/runs/{run_id}/result")
+    async def edit_result(run_id: str, result: Decomposition):
+        run = get_run_or_404(run_id)
+        if run["status"] != "done":
+            raise HTTPException(409, "Результат ещё не готов")
+        sources = [Source(id=s.id, kind=s.kind, file=s.file, title=s.title, text=s.excerpt) for s in result.sources]
+        issues, coverage = run_checks(sources, result.requirements, result.stories)
+        result.issues, result.coverage = issues, coverage
+        result.stats = compute_stats(result.requirements, result.stories, result.questions, result.gaps,
+                                     result.assumptions, issues)
+        data = result.model_dump()
+        store().update_run(run_id, result=data)
+        runner().publish(run_id, "result_edited", {"stats": data["stats"], "coverage": data["coverage"],
+                                                   "issues": data["issues"]})
+        return data
+
+    @app.get("/api/runs/{run_id}/export/{fmt}")
+    def export(run_id: str, fmt: str):
+        if fmt not in EXPORTS:
+            raise HTTPException(404, "Формат: json, xlsx или docx")
+        run = get_run_or_404(run_id)
+        if not run.get("result"):
+            raise HTTPException(409, "Результат ещё не готов")
+        result = Decomposition.model_validate(run["result"])
+        media, render = EXPORTS[fmt]
+        filename = quote(f"{result.epic.label}.{fmt}")
+        disposition = f"attachment; filename=\"decomposition-{run_id}.{fmt}\"; filename*=UTF-8''{filename}"
+        return Response(render(result), media_type=media, headers={"Content-Disposition": disposition})
+
+    @app.get("/api/runs/{run_id}/events")
+    async def events(run_id: str, replay: bool = False, after: int = 0,
+                     last_event_id: str | None = Header(default=None)):
+        get_run_or_404(run_id)
+        after = int(last_event_id) if last_event_id and last_event_id.isdigit() else after
+
+        def fmt(e) -> str:
+            return f"id: {e.seq}\nevent: {e.type}\ndata: {json.dumps(e.data, ensure_ascii=False)}\n\n"
+
+        async def stream():
+            queue = runner().subscribe(run_id)
+            try:
+                last, prev_ts = after, None
+                for e in store().events(run_id, after):
+                    if replay and prev_ts is not None:
+                        await asyncio.sleep(min(e.ts - prev_ts, REPLAY_MAX_PAUSE))
+                    prev_ts = e.ts
+                    last = e.seq
+                    yield fmt(e)
+                if replay or get_run_or_404(run_id)["status"] in TERMINAL:
+                    return
+                while True:
+                    try:
+                        e = await asyncio.wait_for(queue.get(), SSE_PING)
+                    except TimeoutError:
+                        yield ": ping\n\n"
+                        continue
+                    if e.seq <= last:
+                        continue
+                    last = e.seq
+                    yield fmt(e)
+                    if e.type in ("run_finished", "run_failed"):
+                        return
+            finally:
+                runner().unsubscribe(run_id, queue)
+
+        return StreamingResponse(stream(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    return app
+
+
+app = create_app()

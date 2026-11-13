@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package courier.v1;
+
+option go_package = "github.com/courier-express/api/gen/go/courier/v1;courierv1";
+
+// Внешняя курьерская служба «Курьер-Экспресс».
+service CourierService {
+  // Стоимость и срок доставки.
+  rpc CalculateRate(CalculateRateRequest) returns (CalculateRateResponse) {}
+  // Пункты выдачи рядом с адресом.
+  rpc ListPickupPoints(ListPickupPointsRequest) returns (ListPickupPointsResponse) {}
+  // Создать отправление. Каждый вызов создаёт новое отправление.
+  rpc CreateShipment(CreateShipmentRequest) returns (CreateShipmentResponse) {}
+  // Отменить отправление в статусе CREATED.
+  rpc CancelShipment(CancelShipmentRequest) returns (CancelShipmentResponse) {}
+  // Этикетка для посылки (PDF).
+  rpc PrintLabel(PrintLabelRequest) returns (PrintLabelResponse) {}
+}
+
+enum DeliveryMethod {
+  DELIVERY_METHOD_UNSPECIFIED = 0;
+  DOOR = 1;
+  PICKUP_POINT = 2;
+}
+
+message Address {
+  string city = 1;
+  string street = 2;
+  string house = 3;
+  string apartment = 4;
+  string zip_code = 5;
+}
+
+message Parcel {
+  int32 weight_grams = 1;
+  int32 length_cm = 2;
+  int32 width_cm = 3;
+  int32 height_cm = 4;
+}
+
+message CalculateRateRequest {
+  Address to = 1;
+  Parcel parcel = 2;
+  DeliveryMethod method = 3;
+}
+
+message CalculateRateResponse {
+  int64 price_kopecks = 1;
+  int32 delivery_days = 2;
+}
+
+message ListPickupPointsRequest {
+  Address near = 1;
+  int32 limit = 2;
+}
+
+message PickupPoint {
+  string id = 1;
+  string name = 2;
+  Address address = 3;
+}
+
+message ListPickupPointsResponse {
+  repeated PickupPoint points = 1;
+}
+
+message CreateShipmentRequest {
+  string order_ref = 1;
+  Address to = 2;
+  Parcel parcel = 3;
+  DeliveryMethod method = 4;
+  string pickup_point_id = 5;
+  string recipient_name = 6;
+  string recipient_phone = 7;
+}
+
+message CreateShipmentResponse {
+  string shipment_id = 1;
+  string tracking_number = 2;
+}
+
+message CancelShipmentRequest {
+  string shipment_id = 1;
+}
+
+message CancelShipmentResponse {
+  bool cancelled = 1;
+}
+
+message PrintLabelRequest {
+  string shipment_id = 1;
+}
+
+message PrintLabelResponse {
+  bytes pdf = 1;
+}
