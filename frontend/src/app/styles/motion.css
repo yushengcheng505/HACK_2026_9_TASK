@@ -1,0 +1,73 @@
+.fx-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.18em;
+  background: var(--color-brand);
+  animation: fx-caret 1s steps(1) infinite;
+}
+
+.fx-live {
+  animation: fx-live 1.6s ease-out infinite;
+}
+
+.fx-dot {
+  animation: fx-dots 1.2s infinite;
+}
+
+.fx-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.fx-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.fx-reveal {
+  animation: fx-reveal 0.5s ease-out both;
+}
+
+@keyframes fx-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes fx-live {
+  0% {
+    box-shadow: 0 0 0 0 rgb(1 222 130 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 9px rgb(1 222 130 / 0);
+  }
+}
+
+@keyframes fx-dots {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@keyframes fx-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-live,
+  .fx-dot,
+  .fx-reveal {
+    animation: none;
+  }
+}

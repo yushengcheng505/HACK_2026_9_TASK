@@ -1,0 +1,45 @@
+@import 'tailwindcss';
+@import './motion.css';
+
+/* Keep in sync with src/shared/config/palette.ts (SVG fills use the TS copy). */
+@theme {
+  --color-*: initial;
+  --color-ink: #020e0e;
+  --color-surface: #031412;
+  --color-panel: #041a17;
+  --color-track: #0a2c25;
+  --color-line: #0f3b32;
+  --color-line-strong: #124a3d;
+  --color-line-input: #165446;
+  --color-line-muted: #1e5446;
+  --color-line-scene: #0b2e27;
+  --color-brand: #01de82;
+  --color-brand-hover: #3bf0a2;
+  --color-brand-mid: #1e8f6e;
+  --color-brand-deep: #05614b;
+  --color-mint: #9df7cf;
+  --color-fg: #e6fff3;
+  --color-fg-soft: #cfefe2;
+  --color-fg-muted: #a9cfc0;
+  --color-fg-dim: #8fb8a8;
+
+  --font-display: Unbounded, sans-serif;
+  --font-sans: Manrope, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  html {
+    line-height: normal;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ink);
+  }
+
+  :is(a, button, input):focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 3px;
+  }
+}

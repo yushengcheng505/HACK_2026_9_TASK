@@ -1,0 +1,15 @@
+export const palette = {
+  ink: '#020E0E',
+  brand: '#01DE82',
+  brandGlow: '#3CEFA2',
+  brandMid: '#1E8F6E',
+  brandDeep: '#05614B',
+  mint: '#9DF7CF',
+  fg: '#E6FFF3',
+  fgDim: '#8FB8A8',
+  lineInput: '#165446',
+  lineMuted: '#1E5446',
+  keyboard: '#072620',
+  keyCap: '#0E4A3C',
+  shadow: '#000000',
+} as const
