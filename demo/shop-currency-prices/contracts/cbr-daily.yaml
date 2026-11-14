@@ -1,0 +1,33 @@
+openapi: 3.0.3
+info:
+  title: CBR daily rates
+  version: 1.0.0
+paths:
+  /scripts/XML_daily.asp:
+    get:
+      operationId: getDailyRates
+      summary: Официальные курсы валют на дату
+      parameters:
+        - in: query
+          name: date_req
+          required: false
+          description: Дата в формате ДД/ММ/ГГГГ; без параметра — курс на сегодня
+          schema: {type: string}
+      responses:
+        "200":
+          description: XML ValCurs с атрибутом Date и списком Valute (CharCode, Nominal, Value)
+          content:
+            application/xml:
+              schema:
+                type: object
+                properties:
+                  Date: {type: string}
+                  Valute:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        CharCode: {type: string}
+                        Nominal: {type: integer}
+                        Value: {type: string, description: Число с запятой, например «92,5108»}
+        "403": {description: Доступ временно ограничен из-за частых запросов}

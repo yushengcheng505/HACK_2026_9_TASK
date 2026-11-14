@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: SMS Center API
+  version: 2.0.0
+paths:
+  /api/v2/messages:
+    post:
+      operationId: sendMessage
+      summary: Отправить SMS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, text, sender]
+              properties:
+                phone: {type: string}
+                text: {type: string}
+                sender: {type: string}
+                status_callback_url: {type: string}
+                reply_callback_url: {type: string}
+      responses:
+        "200":
+          description: Принято к отправке
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id: {type: string}
+                  parts: {type: integer}
+        "403": {description: Номер в стоп-листе}
+        "429": {description: Превышен лимит}
+        "503": {description: Шлюз недоступен}
+  /api/v2/messages/{message_id}:
+    get:
+      operationId: getMessage
+      summary: Статус доставки SMS
+      parameters:
+        - in: path
+          name: message_id
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Статус
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_id: {type: string}
+                  status: {type: string, enum: [QUEUED, SENT, DELIVERED, FAILED]}
+  /api/v2/stoplist/{phone}:
+    get:
+      operationId: checkStoplist
+      summary: Проверить, отказался ли номер от SMS
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Результат
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blocked: {type: boolean}

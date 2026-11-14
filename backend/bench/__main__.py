@@ -1,6 +1,6 @@
 """Мини-бенчмарк проверяющих агентов.
 
-  uv run python -m bench e2e    --out bench/results/<метка> [--repeats 2] [--parallel 4] [--variants a,b]
+  uv run python -m bench e2e    --out bench/results/<метка> [--repeats 2] [--parallel 4] [--variants a,b] [--demos x,y]
   uv run python -m bench review --out bench/results/<метка> [--bases A,B] [--repeats 2] [--parallel 4] [--extended]
   uv run python -m bench report --out bench/results/<метка>
 
@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from statistics import mean
 
+from app.config import get_settings
 from app.demos import load_demo
 from app.graph import encode_files
 
@@ -24,6 +25,12 @@ from bench.mutations import mutate
 from bench.score import score_e2e, score_review
 
 BASES = ["affbf77db561", "8ed2ce672494"]
+DEMOS = ["boutique-delivery", "shop-sbp-payments", "clinic-sms-reminders", "shop-currency-prices"]
+
+
+def external_files(demo_id: str) -> list[str]:
+    meta = json.loads((get_settings().demo_dir / demo_id / "demo.json").read_text(encoding="utf-8"))
+    return meta.get("bench", {}).get("external_contracts", [])
 
 
 def _save(path: Path, data: dict) -> None:
@@ -53,23 +60,31 @@ async def _jobs(jobs, parallel: int) -> None:
     await asyncio.gather(*(guarded(path, job) for path, job in jobs))
 
 
-async def e2e(out: Path, repeats: int, parallel: int, variants: list[str]) -> None:
+def _e2e_name(demo_id: str, v: str, n: int) -> str:
+    """Прогоны основного демо — без префикса, как в прежних замерах."""
+    return f"e2e-{v}-{n}" if demo_id == DEMOS[0] else f"e2e-{demo_id}-{v}-{n}"
+
+
+async def e2e(out: Path, repeats: int, parallel: int, variants: list[str], demos: list[str]) -> None:
     llms = {v: variant_llm(v, out) for v in variants}
-    demo = load_demo("boutique-delivery")
-    payload = {"title": demo.title, "epic_text": demo.epic_text, "files": encode_files(demo.files),
-               "skip_questions": True}
     jobs = []
-    for n in range(1, repeats + 1):
-        for v in variants:
-            path = out / f"e2e-{v}-{n}.json"
-            if path.exists():
-                continue
+    for demo_id in demos:
+        demo = load_demo(demo_id)
+        payload = {"title": demo.title, "epic_text": demo.epic_text, "files": encode_files(demo.files),
+                   "skip_questions": True}
+        ext = external_files(demo_id)
+        for n in range(1, repeats + 1):
+            for v in variants:
+                path = out / f"{_e2e_name(demo_id, v, n)}.json"
+                if path.exists():
+                    continue
 
-            async def job(v=v, path=path):
-                run = await run_graph(llms[v], VARIANTS[v], payload=copy.deepcopy(payload))
-                _save(path, {"kind": "e2e", "variant": v, "score": score_e2e(run), "run": run})
+                async def job(v=v, path=path, payload=payload, ext=ext, demo_id=demo_id):
+                    run = await run_graph(llms[v], VARIANTS[v], payload=copy.deepcopy(payload))
+                    _save(path, {"kind": "e2e", "variant": v, "demo": demo_id, "score": score_e2e(run, ext),
+                                 "run": run})
 
-            jobs.append((path, job))
+                jobs.append((path, job))
     await _jobs(jobs, parallel)
 
 
@@ -121,7 +136,7 @@ def _load(out: Path, kind: str, rescore: bool = True) -> list[dict]:
         data = json.loads(p.read_text(encoding="utf-8"))
         run = data.pop("run", None)
         if kind == "e2e" and rescore and run is not None:
-            data["score"] = score_e2e(run)
+            data["score"] = score_e2e(run, external_files(data.get("demo", DEMOS[0])))
         key = (data.get("base"), data.get("state"), data.get("extended", False))
         if starts and run is not None and key in starts:
             state, muts = starts[key]
@@ -152,20 +167,24 @@ def report(out: Path) -> str:
     if e2e_rows:
         lines += ["## Этап 2: полные прогоны демо-эпика", "",
                   "| вариант | прогонов | мин | вызовов | повторов | рассужд., тыс. симв. | вход, тыс. симв. | историй | задач | "
-                  "пробелов | противоречие 15 мин сохранено | ошибок кода | кандидатов в дубли | нерешённых | не проверено |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
-        for v in _present(e2e_rows):
-            rs = [r["score"] for r in e2e_rows if r["variant"] == v]
+                  "пробелов | противоречие 15 мин сохранено | ошибок кода | кандидатов в дубли | нерешённых | не проверено | "
+                  "кругов доработки | внешний метод в 2+ сервисах | требований только с тестами | подтверждённых дублей |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        demos = list(dict.fromkeys(r.get("demo", DEMOS[0]) for r in e2e_rows))
+        for demo_id, v in [(d, v) for d in demos for v in _present(e2e_rows)]:
+            rs = [r["score"] for r in e2e_rows if r["variant"] == v and r.get("demo", DEMOS[0]) == demo_id]
             if not rs:
                 continue
             ok = [r for r in rs if not r.get("error") and "tasks" in r]
             lines.append("| " + " | ".join([
-                v, f"{len(ok)}/{len(rs)}", _avg(r["seconds"] / 60 for r in rs), _avg(r["calls"] for r in rs),
+                v if len(demos) == 1 else f"{demo_id} · {v}", f"{len(ok)}/{len(rs)}", _avg(r["seconds"] / 60 for r in rs), _avg(r["calls"] for r in rs),
                 _avg(r["retries"] for r in rs), _avg(r["reasoning_kchars"] for r in rs),
                 _avg(r["input_kchars"] for r in rs), _avg(r.get("stories") for r in ok), _avg(r.get("tasks") for r in ok),
                 _avg(r.get("gaps") for r in ok), _rate(r.get("contradiction_kept") for r in ok),
                 _avg(r.get("code_errors") for r in ok), _avg(r.get("dup_candidates") for r in ok),
-                _avg(r.get("unresolved") for r in ok), _avg(r.get("review_skipped") for r in ok)]) + " |")
+                _avg(r.get("unresolved") for r in ok), _avg(r.get("review_skipped") for r in ok),
+                _avg(r.get("redo_rounds") for r in ok), _avg(r.get("owner_conflicts") for r in ok),
+                _avg(r.get("tests_only_requirements") for r in ok), _avg(r.get("dup_confirmed") for r in ok)]) + " |")
         lines.append("")
 
     rev = _load(out, "review")
@@ -223,12 +242,13 @@ def main() -> None:
     parser.add_argument("--parallel", type=int, default=4)
     parser.add_argument("--variants", default=",".join(VARIANTS))
     parser.add_argument("--bases", default=",".join(BASES))
+    parser.add_argument("--demos", default=DEMOS[0])
     parser.add_argument("--extended", action="store_true", help="добавить дефекты M8–M9")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     variants = args.variants.split(",")
     if args.command == "e2e":
-        asyncio.run(e2e(args.out, args.repeats, args.parallel, variants))
+        asyncio.run(e2e(args.out, args.repeats, args.parallel, variants, args.demos.split(",")))
     elif args.command == "review":
         asyncio.run(review(args.out, args.repeats, args.parallel, variants, args.bases.split(","), args.extended))
     print(report(args.out))

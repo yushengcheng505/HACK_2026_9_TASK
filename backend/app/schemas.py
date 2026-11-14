@@ -118,6 +118,50 @@ class StoriesOut(BaseModel):
     stories: list[StoryDraft]
 
 
+class ServicePlan(BaseModel):
+    name: str
+    role: str
+    basis: list[GapEvidence] = []
+
+
+class ExternalCall(BaseModel):
+    """Операция контракта внешней системы и единственный сервис, который её вызывает."""
+    op: str
+    service: str
+    timeout_ms: int
+    retry: Literal["safe", "unsafe"]
+    note: str = ""
+    story: str = ""
+    basis: list[GapEvidence] = []
+
+
+class ServiceLink(BaseModel):
+    """Вызов между своими сервисами: существующий метод контракта или новый, который нужно создать."""
+    caller: str
+    callee: str
+    method: str
+    new: bool
+    purpose: str
+    story: str = ""
+    basis: list[GapEvidence] = []
+
+
+class StorePlan(BaseModel):
+    name: str
+    service: str
+    data: str
+    story: str = ""
+    basis: list[GapEvidence] = []
+
+
+class ArchitectureOut(BaseModel):
+    services: list[ServicePlan]
+    external_calls: list[ExternalCall] = []
+    links: list[ServiceLink] = []
+    stores: list[StorePlan] = []
+    rules: list[str] = []
+
+
 class TaskResponse(BaseModel):
     finding_id: str
     status: Literal["fixed", "disputed"]
@@ -268,6 +312,7 @@ class Decomposition(BaseModel):
     stats: Stats = Stats()
     model: str = ""
     prompt_versions: dict[str, str] = {}
+    architecture: ArchitectureOut | None = None
 
 
 def epic_label(title: str) -> str:

@@ -14,6 +14,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from app.architecture import architect_enabled, ground, plan_problems
 from app.calls import DECISIONS_HEADING, ask, emit, get_limiter, get_llm
 from app.calls import decisions_block as _decisions_block
 from app.calls import language_line as _language_line
@@ -29,7 +30,9 @@ from app.llm import LLMError
 from app.prompts import prompt_snapshot
 from app.review import judge_gaps, legacy_critic, resolution_check, review_options, review_round
 from app.schemas import (
+    CONTRACT_OP_KINDS,
     AnalystOut,
+    ArchitectureOut,
     Decomposition,
     Epic,
     Finding,
@@ -67,6 +70,7 @@ class State(TypedDict, total=False):
     gaps: list[dict]
     assumptions: list[str]
     stories: list[dict]
+    architecture: dict
     issues: list[dict]
     coverage: dict
     critic_round: int
@@ -204,6 +208,45 @@ async def stories_node(state: State, config: RunnableConfig) -> State:
     return {"stories": [s.model_dump() for s in stories]}
 
 
+async def architect_node(state: State, config: RunnableConfig) -> State:
+    """Общий план интеграции до задач: кто какой внешний метод вызывает, связи сервисов, хранилища, правила.
+    Код проверяет план и один раз возвращает ошибки на исправление."""
+    if not architect_enabled(config):
+        return {}
+    emit("node_started", node="architect", label="Архитектура интеграции")
+    settings = get_settings()
+    sources, reqs, stories = _sources(state), _requirements(state), _stories(state)
+    query = " ".join([state["epic_text"], *(s.title for s in stories), *(c for s in stories for c in s.acceptance_criteria)])
+    context = select_context(sources, query, settings.context_char_budget)
+    ops = "\n".join(f"- {s.id} ({s.file}): {s.title}" for s in sources if s.kind in CONTRACT_OP_KINDS) or "—"
+    overview = "\n".join(f"- {s.id}: {s.title} (требования: {', '.join(s.requirement_ids) or '—'})\n"
+                         + "\n".join(f"  - {c}" for c in s.acceptance_criteria) for s in stories)
+    user = (f"# Эпик: {state['title']}\n{_language_line(state)}\n\n"
+            f"## Требования\n{_requirements_block(reqs)}\n\n"
+            f"## {DECISIONS_HEADING}\n{_decisions_block(state)}\n\n"
+            f"## Истории\n{overview}\n\n"
+            f"## Операции контрактов\n{ops}\n\n"
+            f"## Источники\n{render_sources(context)}")
+    try:
+        plan: ArchitectureOut = await ask(config, "architect", "architect", user, ArchitectureOut)
+        story_ids = [s.id for s in stories]
+        problems = first_problems = plan_problems(plan, sources, reqs, story_ids)
+        if problems:
+            fix = (f"\n\n## Твой план\n```json\n{plan.model_dump_json()}\n```\n\n"
+                   "## Ошибки плана — исправь и верни план целиком\n" + "\n".join(f"- {p}" for p in problems))
+            plan = await ask(config, "architect", "architect", user + fix, ArchitectureOut)
+            problems = plan_problems(plan, sources, reqs, story_ids)
+        plan = ground(plan, sources)
+    except LLMError as e:  # без плана конвейер работает как раньше
+        emit("node_finished", node="architect", label="Архитектура интеграции", summary=f"План не построен: {e}")
+        return {}
+    emit("architecture_planned", plan=plan.model_dump(), problems=problems, first_problems=first_problems)
+    emit("node_finished", node="architect", label="Архитектура интеграции",
+         summary=f"Сервисов: {len(plan.services)}, внешних вызовов: {len(plan.external_calls)}, "
+                 f"связей: {len(plan.links)}" + (f", замечаний к плану: {len(problems)}" if problems else ""))
+    return {"architecture": plan.model_dump()}
+
+
 def _next_task_number(stories: list[Story]) -> int:
     numbers = [int(m.group(1)) for s in stories for t in s.tasks if (m := re.match(r"TASK-(\d+)$", t.id))]
     return max(numbers, default=0) + 1
@@ -333,6 +376,7 @@ async def finalize_node(state: State, config: RunnableConfig) -> State:
         stats=compute_stats(reqs, stories, questions, gaps, assumptions, issues),
         model=get_llm(config).model,
         prompt_versions={name: p.version for name, p in prompt_snapshot().items()},
+        architecture=state.get("architecture"),
     )
     emit("run_finished", stats=result.stats.model_dump(), coverage=result.coverage.model_dump())
     emit("node_finished", node="finalize", label="Сборка результата",
@@ -348,6 +392,7 @@ def build_graph(checkpointer=None):
     g.add_node("analyst", analyst_node)
     g.add_node("ask_user", ask_user_node)
     g.add_node("stories", stories_node)
+    g.add_node("architect", architect_node)
     g.add_node("tasks", tasks_node)
     g.add_node("checks", checks_node)
     g.add_node("critic", critic_node)
@@ -358,7 +403,8 @@ def build_graph(checkpointer=None):
     g.add_edge("requirements", "analyst")
     g.add_edge("analyst", "ask_user")
     g.add_edge("ask_user", "stories")
-    g.add_edge("stories", "tasks")
+    g.add_edge("stories", "architect")
+    g.add_edge("architect", "tasks")
     g.add_edge("tasks", "checks")
     g.add_edge("checks", "critic")
     g.add_conditional_edges("critic", after_critic, ["tasks", "finalize"])

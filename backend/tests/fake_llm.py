@@ -72,7 +72,20 @@ def default_replies():
         return {"verdicts": [{"finding_id": f, "verdict": "confirmed", "reason": "подтверждаю"}
                              for f in dict.fromkeys(re.findall(r'"id": "(F-\d+)"', user))]}
 
-    return {"requirements": requirements, "analyst": analyst, "stories": stories, "tasks": tasks, "critic": critic,
+    def architect(user):
+        return {"services": [{"name": "checkoutservice", "role": "оформление заказа"},
+                             {"name": "shippingservice", "role": "доставка, единственный клиент курьера"}],
+                "external_calls": [{"op": "PROTO:CourierService.CreateShipment", "service": "shippingservice",
+                                    "timeout_ms": 3000, "retry": "unsafe", "story": "US-001",
+                                    "basis": [{"source_id": "PROTO:CourierService.CreateShipment", "quote": "CreateShipment"}]},
+                                   {"op": "PROTO:CourierService.CalculateRate", "service": "shippingservice",
+                                    "timeout_ms": 300, "retry": "safe", "story": "US-002"}],
+                "links": [{"caller": "checkoutservice", "callee": "shippingservice",
+                           "method": "PROTO:ShippingService.ShipOrder", "new": False,
+                           "purpose": "создать отправление после оплаты"}],
+                "stores": [], "rules": ["У каждого внешнего вызова есть дедлайн"]}
+
+    return {"architect": architect, "requirements": requirements, "analyst": analyst, "stories": stories, "tasks": tasks, "critic": critic,
             "reviewer": reviewer, "junction": lambda user: {"findings": []},
             "simplifier": lambda user: {"findings": []}, "skeptic": skeptic}
 

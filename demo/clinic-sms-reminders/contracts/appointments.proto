@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package clinic.v1;
+
+option csharp_namespace = "Clinic.Appointments";
+
+import "google/protobuf/timestamp.proto";
+
+service AppointmentService {
+  // Записи на интервал времени — для напоминаний.
+  rpc ListAppointments(ListAppointmentsRequest) returns (ListAppointmentsResponse);
+  // Отмена записи; слот освобождается для других пациентов.
+  rpc CancelAppointment(CancelAppointmentRequest) returns (CancelAppointmentResponse);
+}
+
+message Appointment {
+  string id = 1;
+  string patient_id = 2;
+  string patient_phone = 3;
+  string patient_email = 4;
+  string doctor_name = 5;
+  string branch_address = 6;
+  google.protobuf.Timestamp starts_at = 7;
+  // Увеличивается при каждом переносе записи.
+  int32 version = 8;
+}
+
+message ListAppointmentsRequest {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+}
+
+message ListAppointmentsResponse {
+  repeated Appointment appointments = 1;
+}
+
+message CancelAppointmentRequest {
+  string appointment_id = 1;
+  string reason = 2;
+}
+
+message CancelAppointmentResponse {
+  bool cancelled = 1;
+}

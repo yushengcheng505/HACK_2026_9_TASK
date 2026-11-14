@@ -6,10 +6,11 @@ from typing import Any
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
 
+from app.architecture import ARCHITECTURE_HEADING, architecture_block
 from app.config import get_settings
 from app.limiter import Limiter
 from app.llm import LLM, OpenAICompatLLM
-from app.schemas import Language, Requirement, Source, Story
+from app.schemas import ArchitectureOut, Language, Requirement, Source, Story
 
 TOKEN_FLUSH = 80
 DECISIONS_HEADING = "Принятые решения (обязательны), допущения и пробелы"
@@ -95,4 +96,7 @@ def decisions_block(state: dict) -> str:
     lines += [f"- Допущение: {a}" for a in state.get("assumptions", [])]
     for g in state.get("gaps", []):
         lines.append(f"- Пробел {g['id']}: {g['text']} Риск: {g['risk']}")
-    return "\n".join(lines) or "—"
+    text = "\n".join(lines) or "—"
+    if state.get("architecture"):
+        text += f"\n\n### {ARCHITECTURE_HEADING}\n{architecture_block(ArchitectureOut.model_validate(state['architecture']))}"
+    return text

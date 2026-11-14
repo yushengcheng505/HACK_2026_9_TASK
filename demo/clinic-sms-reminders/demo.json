@@ -1,0 +1,11 @@
+{
+  "title": "SMS-напоминания о приёме в клинике «Здоровье+»",
+  "summary": "Сервисы клиники на C# (.NET, gRPC) подключают SMS-шлюз «СМС-Центр»: напоминания о записи, подтверждение и отмена ответом.",
+  "files": {
+    "product_docs": ["docs/product/clinic-platform.md"],
+    "external_docs": ["docs/external/sms-center-guide.md"],
+    "contracts": ["contracts/sms-center.yaml", "contracts/appointments.proto"],
+    "examples": ["examples/EmailReminder.cs"]
+  },
+  "bench": {"external_contracts": ["sms-center.yaml"]}
+}

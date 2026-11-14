@@ -1,0 +1,11 @@
+{
+  "title": "Оплата через СБП в магазине «Полка»",
+  "summary": "Магазин на Python (FastAPI, REST) подключает оплату по QR-коду СБП через банк «Восход»: оплата, статус, возвраты.",
+  "files": {
+    "product_docs": ["docs/product/polka-shop.md"],
+    "external_docs": ["docs/external/voskhod-sbp-guide.md"],
+    "contracts": ["contracts/voskhod-sbp.yaml", "contracts/payments-internal.yaml"],
+    "examples": ["examples/card_payment.py"]
+  },
+  "bench": {"external_contracts": ["voskhod-sbp.yaml"]}
+}

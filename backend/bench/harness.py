@@ -33,6 +33,7 @@ VARIANTS: dict[str, Variant] = {
     "review-noskeptic": Variant({**FULL, "review_skeptic": False}),
     "review": Variant(FULL),
     "review-nosimplifier": Variant({**FULL, "review_simplifier": False}),
+    "review-architect": Variant({**FULL, "architect": True}),
 }
 # Варианты замеров 2–3 (лимит 32k, «рассуждай коротко», линзы, примеры, строгий скептик) — в истории git
 # (коммит bc3cdc2); победитель перенесён в prompts/, описание и цифры — docs/review-benchmark.md.

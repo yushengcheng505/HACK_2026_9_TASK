@@ -52,7 +52,7 @@ async def test_full_run_is_metered_and_scored():
     assert run["error"] is None and run["result"]
     roles = {c["prompt"] for c in run["calls"]}
     assert {"requirements", "reviewer", "skeptic", "tasks"} <= roles
-    score = score_e2e(run)
+    score = score_e2e(run, ["courier.proto", "courier-tracking.yaml"])
     assert score["tasks"] == 4 and score["calls"] == len(run["calls"])
 
 

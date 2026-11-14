@@ -1,0 +1,62 @@
+openapi: 3.0.3
+info:
+  title: paymentservice internal API
+  version: 1.0.0
+paths:
+  /payments/card:
+    post:
+      operationId: payByCard
+      summary: Оплатить заказ картой
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, amount_kopecks, card_token]
+              properties:
+                order_id: {type: string}
+                amount_kopecks: {type: integer}
+                card_token: {type: string}
+      responses:
+        "200":
+          description: Платёж проведён
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_id: {type: string}
+                  status: {type: string, enum: [PAID, DECLINED]}
+  /payments/{payment_id}:
+    get:
+      operationId: getPayment
+      summary: Платёж по идентификатору
+      parameters:
+        - in: path
+          name: payment_id
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Платёж
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  payment_id: {type: string}
+                  order_id: {type: string}
+                  method: {type: string, enum: [CARD]}
+                  status: {type: string}
+  /orders/{order_id}/paid:
+    post:
+      operationId: markOrderPaid
+      summary: Отметить заказ оплаченным (orderservice)
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Заказ переведён в PAID}
+        "409": {description: Заказ уже оплачен или отменён}

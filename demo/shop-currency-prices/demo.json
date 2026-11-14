@@ -1,0 +1,11 @@
+{
+  "title": "Цены в долларах и евро в магазине «Полка»",
+  "summary": "Каталог на Java (Spring Boot, REST) показывает цены товаров в долларах и евро по курсу Центробанка.",
+  "files": {
+    "product_docs": ["docs/product/catalog.md"],
+    "external_docs": ["docs/external/cbr-rates-guide.md"],
+    "contracts": ["contracts/cbr-daily.yaml", "contracts/catalog-api.yaml"],
+    "examples": ["examples/ProductController.java"]
+  },
+  "bench": {"external_contracts": ["cbr-daily.yaml"]}
+}

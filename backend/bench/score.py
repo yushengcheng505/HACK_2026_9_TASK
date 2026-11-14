@@ -5,11 +5,42 @@ from collections import Counter
 
 from app.checks import run_checks
 from app.findings import normalize
-from app.schemas import Decomposition, Finding, Requirement, Source, Story
+from app.schemas import Decomposition, Finding, Requirement, Source, Story, Task
 
 from bench.mutations import Mutation
 
 CONTRADICTION = re.compile(r"15\s*мин", re.I)
+# Свои сервисы в демо-эпиках названы *service; внешние операции — из файлов bench.external_contracts демо.
+SERVICE = re.compile(r"\b([a-z]+service|frontend|webportal)\b")
+CALLS = re.compile(r"клиент|вызов|вызыв", re.I)
+
+
+def _caller(task: Task, op: str) -> str | None:
+    """Сервис, в котором задача реализует вызов внешней операции, если задача об этом."""
+    method = op.rsplit(".", 1)[-1] if op.startswith("PROTO:") else op.split(" ", 1)[-1].split("{")[0].rstrip("/")
+    if task.type not in ("backend", "integration") or method not in task.title + task.description[:200]:
+        return None
+    if not CALLS.search(task.title):
+        return None
+    found = SERVICE.search(task.title) or SERVICE.search(task.description)
+    return found.group(1) if found else None
+
+
+def seams(result: Decomposition, external_files: list[str]) -> dict:
+    """Стыки между историями: внешний метод, который вызывают из нескольких сервисов, и требования,
+    закрытые только тестами."""
+    external = {s.id for s in result.sources if s.file in external_files and s.kind in ("proto_rpc", "openapi_op")}
+    callers: dict[str, set[str]] = {}
+    for story in result.stories:
+        for task in story.tasks:
+            for op in task.source_refs:
+                if op in external and (svc := _caller(task, op)):
+                    callers.setdefault(op, set()).add(svc)
+    conflicts = sorted(op for op, svcs in callers.items() if len(svcs) > 1)
+    implemented = {r for s in result.stories for t in s.tasks if t.type != "qa" for r in t.requirement_ids}
+    tests_only = [r.id for r in result.requirements if r.id not in implemented]
+    return {"owner_conflicts": len(conflicts), "conflict_ops": conflicts,
+            "tests_only_requirements": len(tests_only)}
 
 
 def cost(run: dict) -> dict:
@@ -35,7 +66,7 @@ def _result(run: dict) -> Decomposition | None:
     return Decomposition.model_validate(run["result"]) if run.get("result") else None
 
 
-def score_e2e(run: dict) -> dict:
+def score_e2e(run: dict, external_files: list[str]) -> dict:
     out = {"error": run["error"], **cost(run)}
     result = _result(run)
     if result is None:
@@ -58,6 +89,9 @@ def score_e2e(run: dict) -> dict:
         "review_skipped": len(result.review_skipped),
         "tasks_failed": len(_events(run, "tasks_failed")),
         "redo_rounds": len([n for n in _events(run, "critic_feedback") if n["notes"]]),
+        "architecture": result.architecture is not None,
+        "dup_confirmed": sum(f.kind == "duplicate" and f.verdict == "confirmed" for f in result.findings),
+        **seams(result, external_files),
     }
 
 

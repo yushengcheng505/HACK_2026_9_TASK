@@ -1,0 +1,83 @@
+openapi: 3.0.3
+info:
+  title: Voskhod SBP API
+  version: 1.0.0
+paths:
+  /v1/qr:
+    post:
+      operationId: createQr
+      summary: Создать динамический QR-код СБП
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          schema: {type: string}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_ref, amount_kopecks, callback_url]
+              properties:
+                order_ref: {type: string}
+                amount_kopecks: {type: integer}
+                callback_url: {type: string}
+      responses:
+        "200":
+          description: QR-код создан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_id: {type: string}
+                  image_png_base64: {type: string}
+                  payload_url: {type: string}
+                  expires_at: {type: string, format: date-time}
+        "429": {description: Превышен лимит запросов}
+        "503": {description: Банк недоступен}
+  /v1/qr/{qr_id}:
+    get:
+      operationId: getQr
+      summary: Статус оплаты по QR-коду
+      parameters:
+        - in: path
+          name: qr_id
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Статус
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qr_id: {type: string}
+                  status: {type: string, enum: [CREATED, PAID, EXPIRED]}
+                  paid_at: {type: string, format: date-time}
+        "404": {description: Нет такого QR-кода}
+  /v1/refunds:
+    post:
+      operationId: createRefund
+      summary: Возврат по оплаченному QR-коду
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qr_id, amount_kopecks]
+              properties:
+                qr_id: {type: string}
+                amount_kopecks: {type: integer}
+      responses:
+        "200":
+          description: Возврат принят
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refund_id: {type: string}
+                  status: {type: string, enum: [ACCEPTED, DONE, REJECTED]}
+        "409": {description: QR-код не оплачен}
+        "422": {description: Сумма возвратов превышает оплату}

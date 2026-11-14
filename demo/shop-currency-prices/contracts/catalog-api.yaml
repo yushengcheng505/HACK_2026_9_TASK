@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: catalogservice API
+  version: 1.0.0
+paths:
+  /products:
+    get:
+      operationId: listProducts
+      summary: Список товаров каталога
+      parameters:
+        - in: query
+          name: page
+          schema: {type: integer}
+      responses:
+        "200":
+          description: Страница товаров
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: "#/components/schemas/Product"}
+  /products/{id}:
+    get:
+      operationId: getProduct
+      summary: Карточка товара
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Товар
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Product"}
+        "404": {description: Нет такого товара}
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id: {type: string}
+        title: {type: string}
+        price_kopecks: {type: integer}
