@@ -131,6 +131,9 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         run = get_run_or_404(run_id)
         if run["status"] != "waiting_answers":
             raise HTTPException(409, "Запуск не ждёт ответов")
+        known = {q["id"] for q in run.get("questions") or []}
+        if unknown := sorted(set(body.answers) - known):
+            raise HTTPException(422, f"Нет таких вопросов: {', '.join(unknown)}")
         runner().resume(run_id, body.answers)
         return {"status": "running"}
 

@@ -66,7 +66,22 @@ def test_every_op_lands_in_exactly_one_list():
     ops = [s.id for s in SOURCES if s.kind == "proto_rpc"]
     for op in ops:
         assert (op in cov.contract_ops_used) != (op in cov.contract_ops_unused), op
+
+
+def test_op_mentioned_only_by_task_is_unused_and_needs_no_test():
+    logging = task("TASK-003", title="Журнал вызовов", refs=["PROTO:Courier.Create", "PROTO:Courier.Label"])
+    issues, cov = run_checks(SOURCES, REQS, [story([task("TASK-001"), logging])])
+    assert "PROTO:Courier.Label" in cov.contract_ops_unused
+    assert "PROTO:Courier.Label" not in cov.contract_ops_used
+    assert "PROTO:Courier.Label" not in cov.ops_without_tests
+    assert ("op_without_tests", "PROTO:Courier.Label") not in codes(issues)
+
+
+def test_op_named_in_task_title_is_used():
+    change = task("TASK-003", title="Добавить pickup_point_id в Courier.Label", refs=["PROTO:Courier.Label"])
+    issues, cov = run_checks(SOURCES, REQS, [story([task("TASK-001"), change])])
     assert "PROTO:Courier.Label" in cov.contract_ops_used
+    assert ("op_without_tests", "PROTO:Courier.Label") in codes(issues)
 
 
 def test_used_op_without_test_task():
@@ -85,6 +100,74 @@ def test_duplicates_format_and_qa_without_scenarios():
     assert ("duplicate_task", "TASK-004") not in found
     assert ("story_format", "US-001") in found
     assert ("qa_without_scenarios", "TASK-003") in found
+
+
+def dup_codes(*titles_types):
+    stories = [Story(id=f"US-00{i}", title="Как покупатель, я хочу x, чтобы y", description="d",
+                     acceptance_criteria=["a"], requirement_ids=["REQ-001"],
+                     tasks=[task(f"TASK-00{i}", type=type_, title=title)])
+               for i, (title, type_) in enumerate(titles_types, 1)]
+    issues, _ = run_checks(SOURCES, REQS, stories)
+    return [i for i in issues if i.code == "duplicate_task"]
+
+
+def test_duplicate_across_stories_by_shared_operation():
+    found = dup_codes(("Расширить shipping.proto и реализовать в shippingservice клиент CourierService.CalculateRate",
+                       "backend"),
+                      ("Реализовать вызов CourierService.CalculateRate в shippingservice с учётом способа доставки",
+                       "integration"))
+    assert [i.target_id for i in found] == ["TASK-002"]
+    assert "TASK-001" in found[0].message and "US-001" in found[0].message
+
+
+def test_duplicate_secret_setup():
+    found = dup_codes(("Настроить секрет x-api-key, конфигурацию ретраев и алерт об инциденте", "devops"),
+                      ("Настроить секрет x-api-key и параметры повторов отмены в Kubernetes", "devops"))
+    assert [i.target_id for i in found] == ["TASK-002"]
+
+
+def test_different_operations_are_not_duplicates():
+    assert dup_codes(("Реализовать клиент CourierService.CalculateRate в shippingservice", "integration"),
+                     ("Реализовать клиент CourierService.CreateShipment в shippingservice", "integration")) == []
+
+
+def test_external_client_and_own_handler_of_same_method_are_not_duplicates():
+    assert dup_codes(("Реализовать клиент CourierService.ListPickupPoints в shippingservice", "integration"),
+                     ("Реализовать обработчик ShippingService.ListPickupPoints в shippingservice", "backend")) == []
+
+
+def test_method_without_service_matches_qualified_method():
+    found = dup_codes(("Написать интеграционный тест CalculateRate в shippingservice", "qa"),
+                      ("Написать интеграционные тесты ShippingService.GetQuote → CourierService.CalculateRate", "qa"))
+    assert [i.target_id for i in found] == ["TASK-002"]
+
+
+def test_generic_rpc_word_does_not_make_duplicates():
+    assert dup_codes(("Добавить RPC ShippingService.GetShipmentByOrder и реализовать его в shippingservice", "backend"),
+                     ("Реализовать RPC ShippingService.CancelShipment и машину состояний отмены в shippingservice",
+                      "backend")) == []
+
+
+def test_same_operation_different_type_group_is_not_duplicate():
+    assert dup_codes(("Реализовать клиент CourierService.CalculateRate в shippingservice", "integration"),
+                     ("Написать интеграционный тест CourierService.CalculateRate в shippingservice", "qa")) == []
+
+
+def test_status_and_events_endpoints_are_not_duplicates():
+    assert dup_codes(("Написать интеграционные тесты опроса GET /v1/shipments/{shipment_id}/status", "qa"),
+                     ("Написать интеграционные тесты опроса GET /v1/shipments/{shipment_id}/events", "qa")) == []
+
+
+def test_story_format_accepts_i_want_that():
+    title = "Как покупатель, я хочу, чтобы после оплаты отправление создавалось, чтобы заказ поехал"
+    issues, _ = run_checks(SOURCES, REQS, [story([task("TASK-001")], title=title)])
+    assert ("story_format", "US-001") not in codes(issues)
+
+
+def test_story_format_requires_value_part():
+    title = "Как покупатель, я хочу, чтобы отправление создавалось автоматически"
+    issues, _ = run_checks(SOURCES, REQS, [story([task("TASK-001")], title=title)])
+    assert ("story_format", "US-001") in codes(issues)
 
 
 def test_stats():

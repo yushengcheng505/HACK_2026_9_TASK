@@ -36,6 +36,13 @@ class Settings:
     demo_dir: Path
     context_char_budget: int
     cors_origins: list[str]
+    review_mode: str
+    review_skeptic: bool
+    review_simplifier: bool
+
+
+def _flag(value: str) -> bool:
+    return value.strip().lower() in ("1", "true", "yes", "on")
 
 
 @lru_cache
@@ -59,4 +66,7 @@ def get_settings() -> Settings:
         demo_dir=Path(env("DEMO_DIR", str(REPO_DIR / "demo"))),
         context_char_budget=int(env("CONTEXT_CHAR_BUDGET", "24000")),
         cors_origins=env("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+        review_mode=env("REVIEW_MODE", "review"),
+        review_skeptic=_flag(env("REVIEW_SKEPTIC", "true")),
+        review_simplifier=_flag(env("REVIEW_SIMPLIFIER", "true")),
     )

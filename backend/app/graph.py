@@ -8,25 +8,31 @@ import asyncio
 import base64
 import json
 import re
-from functools import lru_cache
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from langchain_core.runnables import RunnableConfig
-from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from app.calls import DECISIONS_HEADING, ask, emit, get_llm
+from app.calls import decisions_block as _decisions_block
+from app.calls import language_line as _language_line
+from app.calls import requirements_block as _requirements_block
+from app.calls import requirements_of as _requirements
+from app.calls import sources_of as _sources
+from app.calls import stories_of as _stories
 from app.checks import compute_stats, run_checks
 from app.config import get_settings
 from app.context import render_sources, select_context, story_context
 from app.language import CONFIDENT, detect_language
-from app.llm import LLM, LLMError, OpenAICompatLLM
+from app.llm import LLMError
 from app.prompts import prompt_snapshot
+from app.review import judge_gaps, legacy_critic, resolution_check, review_options, review_round
 from app.schemas import (
     AnalystOut,
-    CriticOut,
     Decomposition,
     Epic,
+    Finding,
     Gap,
     Issue,
     Language,
@@ -38,6 +44,7 @@ from app.schemas import (
     StoriesOut,
     Story,
     Task,
+    TaskResponse,
     TasksOut,
     epic_label,
 )
@@ -46,8 +53,6 @@ from app.sources import InputFile, parse_inputs
 MAX_QUESTIONS = 5
 LANGUAGE_QUESTION_ID = "Q-LANG"
 LANGUAGE_CHOICES = ["C++", "C#", "Go", "Python", "Java"]
-TOKEN_FLUSH = 80
-NOT_FIXABLE_BY_TASKS = ("story_format", "story_without_criteria", "requirement_without_story")
 
 
 class State(TypedDict, total=False):
@@ -66,6 +71,9 @@ class State(TypedDict, total=False):
     coverage: dict
     critic_round: int
     redo: dict[str, str]
+    redone: list[str]
+    findings: list[dict]
+    review_skipped: list[dict]
     result: dict
 
 
@@ -75,79 +83,6 @@ def encode_files(files: list[InputFile]) -> list[dict]:
 
 def decode_files(files: list[dict]) -> list[InputFile]:
     return [InputFile(name=f["name"], role=f["role"], content=base64.b64decode(f["data"])) for f in files]
-
-
-def emit(type: str, **data: Any) -> None:
-    get_stream_writer()({"type": type, "data": data})
-
-
-class TokenSink:
-    def __init__(self, node: str):
-        self.node, self.buffer, self.kind = node, "", "content"
-
-    def __call__(self, text: str, kind: str) -> None:
-        if kind != self.kind:
-            self.flush()
-            self.kind = kind
-        self.buffer += text
-        if len(self.buffer) >= TOKEN_FLUSH:
-            self.flush()
-
-    def flush(self) -> None:
-        if self.buffer:
-            emit("token", node=self.node, kind=self.kind, text=self.buffer)
-            self.buffer = ""
-
-
-@lru_cache
-def _default_llm() -> OpenAICompatLLM:
-    return OpenAICompatLLM(get_settings())
-
-
-def get_llm(config: RunnableConfig) -> LLM:
-    return (config.get("configurable") or {}).get("llm") or _default_llm()
-
-
-async def ask(config: RunnableConfig, node: str, prompt: str, user: str, schema):
-    sink = TokenSink(node)
-    try:
-        return await get_llm(config).complete_json(prompt, user, schema, on_token=sink)
-    finally:
-        sink.flush()
-
-
-def _sources(state: State) -> list[Source]:
-    return [Source.model_validate(s) for s in state["sources"]]
-
-
-def _requirements(state: State) -> list[Requirement]:
-    return [Requirement.model_validate(r) for r in state.get("requirements", [])]
-
-
-def _stories(state: State) -> list[Story]:
-    return [Story.model_validate(s) for s in state.get("stories", [])]
-
-
-def _language_line(state: State) -> str:
-    lang = Language.model_validate(state.get("language") or {})
-    if not lang.value:
-        return "Целевой язык программирования: не определён."
-    return f"Целевой язык программирования: {lang.value} (уверенность {lang.confidence})."
-
-
-def _requirements_block(reqs: list[Requirement]) -> str:
-    return "\n".join(f"- {r.id} [{r.type}] {r.text} (источники: {', '.join(r.source_refs) or '—'})" for r in reqs)
-
-
-def _decisions_block(state: State) -> str:
-    lines = []
-    for q in state.get("questions", []):
-        if q.get("answer"):
-            lines.append(f"- Вопрос: {q['text']}\n  Ответ: {q['answer']}")
-    lines += [f"- Допущение: {a}" for a in state.get("assumptions", [])]
-    for g in state.get("gaps", []):
-        lines.append(f"- Пробел {g['id']}: {g['text']} Риск: {g['risk']}")
-    return "\n".join(lines) or "—"
 
 
 # ---------- узлы ----------
@@ -208,15 +143,21 @@ async def analyst_node(state: State, config: RunnableConfig) -> State:
     lang = Language.model_validate(state["language"])
     if lang.confidence < CONFIDENT:
         questions.insert(0, _language_question(lang))
-    gaps = [Gap(id=f"GAP-{i}", **g.model_dump()) for i, g in enumerate(out.gaps, 1)]
+    drafts, findings, skipped = out.gaps, [], []
+    if review_options(config).mode == "review" and drafts:
+        drafts, findings, skipped = await judge_gaps(state, config, drafts)
+    gaps = [Gap(id=f"GAP-{i}", **g.model_dump()) for i, g in enumerate(drafts, 1)]
     for g in gaps:
         emit("gap_found", gap=g.model_dump())
     if questions:
         emit("questions_asked", questions=[q.model_dump() for q in questions],
              waiting=not state.get("skip_questions", False))
     emit("node_finished", node="analyst", label="Аналитик: вопросы и пробелы",
-         summary=f"Вопросов: {len(questions)}, пробелов: {len(gaps)}")
-    return {"questions": [q.model_dump() for q in questions], "gaps": [g.model_dump() for g in gaps]}
+         summary=f"Вопросов: {len(questions)}, пробелов: {len(gaps)}"
+                 + (f" (отклонено: {len(out.gaps) - len(gaps)})" if len(out.gaps) > len(gaps) else ""))
+    return {"questions": [q.model_dump() for q in questions], "gaps": [g.model_dump() for g in gaps],
+            "findings": state.get("findings", []) + [f.model_dump() for f in findings],
+            "review_skipped": state.get("review_skipped", []) + [s.model_dump() for s in skipped]}
 
 
 async def ask_user_node(state: State) -> State:
@@ -250,7 +191,7 @@ async def stories_node(state: State, config: RunnableConfig) -> State:
     reqs = _requirements(state)
     user = (f"# Эпик: {state['title']}\n{state['epic_text']}\n\n{_language_line(state)}\n\n"
             f"## Требования\n{_requirements_block(reqs)}\n\n"
-            f"## Ответы, допущения и пробелы\n{_decisions_block(state)}")
+            f"## {DECISIONS_HEADING}\n{_decisions_block(state)}")
     out: StoriesOut = await ask(config, "stories", "stories", user, StoriesOut)
     req_ids = {r.id for r in reqs}
     stories = []
@@ -278,26 +219,41 @@ async def tasks_node(state: State, config: RunnableConfig) -> State:
     sources = _sources(state)
     reqs = {r.id: r for r in _requirements(state)}
     semaphore = asyncio.Semaphore(settings.llm_concurrency)
+    fresh: dict[str, list] = {}
+    responses: list[TaskResponse] = []
+    story_list = "\n".join(f"- {s.id}: {s.title} (требования: {', '.join(s.requirement_ids) or '—'})"
+                           for s in stories)
 
-    async def generate(story: Story) -> list:
+    def other_tasks(story: Story) -> str:
+        lines = [f"- {s.id}: {t.title}" for s in stories if s.id != story.id
+                 for t in fresh.get(s.id, s.tasks)]
+        return "\n".join(lines) or "—"
+
+    async def generate(story: Story) -> list | None:
         story_reqs = [reqs[r] for r in story.requirement_ids if r in reqs]
         refs = {ref for r in story_reqs for ref in r.source_refs}
         query = " ".join([story.title, story.description, *story.acceptance_criteria, *(r.text for r in story_reqs)])
         context = story_context(sources, refs, query, settings.context_char_budget)
-        others = [f"- {t.title}" for s in stories if s.id != story.id for t in s.tasks]
-        user = (f"# Эпик: {state['title']}\n{_language_line(state)}\n\n"
-                f"## История {story.id}\n{story.title}\n{story.description}\n"
-                "Критерии приёмки:\n" + "\n".join(f"- {c}" for c in story.acceptance_criteria) +
-                f"\n\n## Требования истории\n{_requirements_block(story_reqs)}\n\n"
-                f"## Ответы, допущения и пробелы\n{_decisions_block(state)}\n\n"
-                f"## Уже созданные задачи других историй\n{chr(10).join(others) or '—'}\n\n"
-                f"## Источники\n{render_sources(context)}")
-        if story.id in redo:
-            current = [t.model_dump(exclude={"id"}) for t in story.tasks]
-            user += (f"\n\n## Текущие задачи истории\n```json\n{json.dumps(current, ensure_ascii=False)}\n```"
-                     f"\n\n## Замечания, которые нужно исправить\n{redo[story.id]}")
         async with semaphore:
-            out: TasksOut = await ask(config, f"tasks:{story.id}", "tasks", user, TasksOut)
+            user = (f"# Эпик: {state['title']}\n{_language_line(state)}\n\n"
+                    f"## История {story.id}\n{story.title}\n{story.description}\n"
+                    "Критерии приёмки:\n" + "\n".join(f"- {c}" for c in story.acceptance_criteria) +
+                    f"\n\n## Требования истории\n{_requirements_block(story_reqs)}\n\n"
+                    f"## {DECISIONS_HEADING}\n{_decisions_block(state)}\n\n"
+                    f"## Другие истории эпика\n{story_list}\n\n"
+                    f"## Уже созданные задачи других историй\n{other_tasks(story)}\n\n"
+                    f"## Источники\n{render_sources(context)}")
+            if story.id in redo:
+                current = [t.model_dump(exclude={"id"}) for t in story.tasks]
+                user += (f"\n\n## Текущие задачи истории\n```json\n{json.dumps(current, ensure_ascii=False)}\n```"
+                         f"\n\n## Замечания, которые нужно исправить\n{redo[story.id]}")
+            try:
+                out: TasksOut = await ask(config, f"tasks:{story.id}", "tasks", user, TasksOut)
+            except LLMError as e:  # история остаётся как была; без задач её вернут на доработку проверки
+                emit("tasks_failed", story_id=story.id, error=str(e))
+                return None
+        fresh[story.id] = out.tasks
+        responses.extend(out.responses)
         return out.tasks
 
     results = await asyncio.gather(*(generate(s) for s in targets))
@@ -305,6 +261,8 @@ async def tasks_node(state: State, config: RunnableConfig) -> State:
     by_id = {s.id: s for s in stories}
     total = 0
     for story, drafts in zip(targets, results):
+        if drafts is None:
+            continue
         target = by_id[story.id]
         if target.tasks:
             emit("tasks_replaced", story_id=story.id, removed=[t.id for t in target.tasks])
@@ -315,8 +273,15 @@ async def tasks_node(state: State, config: RunnableConfig) -> State:
             target.tasks.append(task)
             emit("task_created", story_id=story.id, task=task.model_dump())
         total += len(drafts)
-    emit("node_finished", node="tasks", label="Технические задачи", summary=f"Задач: {total}")
-    return {"stories": [s.model_dump() for s in stories], "redo": {}}
+    failed = sum(drafts is None for drafts in results)
+    emit("node_finished", node="tasks", label="Технические задачи",
+         summary=f"Задач: {total}" + (f", сбоев модели: {failed}" if failed else ""))
+    findings = [Finding.model_validate(f) for f in state.get("findings", [])]
+    by_id = {f.id: f for f in findings}
+    for r in responses:
+        if (f := by_id.get(r.finding_id)) is not None:
+            f.resolution, f.resolution_note = r.status, r.note
+    return {"stories": [s.model_dump() for s in stories], "redo": {}, "findings": [f.model_dump() for f in findings]}
 
 
 async def checks_node(state: State) -> State:
@@ -329,69 +294,14 @@ async def checks_node(state: State) -> State:
     return {"issues": [i.model_dump() for i in issues], "coverage": coverage.model_dump()}
 
 
-def _issues_by_story(state: State) -> dict[str, list[str]]:
-    """Ошибки проверок, которые можно исправить перегенерацией задач конкретной истории."""
-    stories = _stories(state)
-    reqs = _requirements(state)
-    task_story = {t.id: s.id for s in stories for t in s.tasks}
-    req_stories: dict[str, list[str]] = {}
-    for s in stories:
-        for r in s.requirement_ids:
-            req_stories.setdefault(r, []).append(s.id)
-    op_stories: dict[str, set[str]] = {}
-    for r in reqs:
-        for ref in r.source_refs:
-            op_stories.setdefault(ref, set()).update(req_stories.get(r.id, []))
-    result: dict[str, list[str]] = {}
-    for raw in state.get("issues", []):
-        issue = Issue.model_validate(raw)
-        if issue.code in NOT_FIXABLE_BY_TASKS:
-            continue
-        targets = ({task_story[issue.target_id]} if issue.target_id in task_story
-                   else set(req_stories.get(issue.target_id, [])) | op_stories.get(issue.target_id, set())
-                   | ({issue.target_id} if issue.target_id.startswith("US-") else set()))
-        for sid in targets:
-            result.setdefault(sid, []).append(f"{issue.target_id}: {issue.message}")
-    return result
-
-
 async def critic_node(state: State, config: RunnableConfig) -> State:
+    opts = review_options(config)
+    if opts.mode == "critic":
+        return await legacy_critic(state, config)
     round_ = state.get("critic_round", 0)
-    if round_ >= get_settings().critic_rounds:
-        return {"redo": {}}
-    emit("node_started", node="critic", label=f"Критик, круг {round_ + 1}")
-    stories = _stories(state)
-    by_story = _issues_by_story(state)
-    payload = [{
-        "id": s.id, "title": s.title, "acceptance_criteria": s.acceptance_criteria,
-        "requirement_ids": s.requirement_ids,
-        "tasks": [{"id": t.id, "type": t.type, "title": t.title, "source_refs": t.source_refs,
-                   "test_scenarios": len(t.test_scenarios)} for t in s.tasks],
-        "check_issues": by_story.get(s.id, []),
-    } for s in stories]
-    user = (f"# Эпик: {state['title']}\n{_language_line(state)}\n\n"
-            f"## Требования\n{_requirements_block(_requirements(state))}\n\n"
-            f"## Истории и задачи\n```json\n{json.dumps(payload, ensure_ascii=False, indent=1)}\n```")
-    try:
-        out: CriticOut = await ask(config, "critic", "critic", user, CriticOut)
-        critic_error = None
-    except LLMError as e:
-        out, critic_error = CriticOut(), str(e)
-    story_ids = {s.id for s in stories}
-    redo: dict[str, str] = {}
-    for note in out.notes:
-        if note.story_id in story_ids:
-            redo[note.story_id] = (redo.get(note.story_id, "") + "\n" + note.problem).strip()
-    for sid, lines in by_story.items():
-        if sid in story_ids:
-            redo[sid] = (redo.get(sid, "") + "\nЗамечания проверок:\n" + "\n".join(f"- {l}" for l in lines)).strip()
-    notes = [{"story_id": sid, "problem": text} for sid, text in redo.items()]
-    emit("critic_feedback", round=round_ + 1, notes=notes, error=critic_error)
-    summary = "Замечаний нет" if not redo else f"На доработку историй: {len(redo)}"
-    if critic_error:
-        summary = f"Критик не ответил, работаем по проверкам кода. {summary}"
-    emit("node_finished", node="critic", label=f"Критик, круг {round_ + 1}", summary=summary)
-    return {"redo": redo, "critic_round": round_ + 1}
+    if round_ >= opts.rounds:
+        return await resolution_check(state, config)
+    return await review_round(state, config, round_ + 1)
 
 
 def after_critic(state: State) -> str:
@@ -417,6 +327,8 @@ async def finalize_node(state: State, config: RunnableConfig) -> State:
         assumptions=assumptions,
         gaps=gaps,
         issues=issues,
+        findings=state.get("findings", []),
+        review_skipped=state.get("review_skipped", []),
         coverage=state.get("coverage") or {},
         stats=compute_stats(reqs, stories, questions, gaps, assumptions, issues),
         model=get_llm(config).model,

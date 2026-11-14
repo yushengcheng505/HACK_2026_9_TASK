@@ -66,6 +66,16 @@ async def test_empty_reply_is_not_sent_back_as_assistant_message():
     assert all(m["content"] for m in second)
 
 
+async def test_retries_are_reported_with_reason():
+    requests: list[dict] = []
+    llm = make_llm(["", '{"notes": [{"story": 1}]}', '{"notes": []}'], requests)
+    retries: list[tuple[int, str]] = []
+    await llm.complete_json("critic", "данные", CriticOut, on_retry=lambda n, reason: retries.append((n, reason)))
+    assert [n for n, _ in retries] == [2, 3]
+    assert "пустой ответ" in retries[0][1]
+    assert "story_id" in retries[1][1]
+
+
 async def test_gives_up_after_three_attempts():
     requests: list[dict] = []
     llm = make_llm(["мусор"] * 3, requests)

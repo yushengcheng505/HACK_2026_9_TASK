@@ -86,6 +86,15 @@ def test_questions_then_answers(client):
     assert client.post(f"/api/runs/{run_id}/answers", json={}).status_code == 409
 
 
+def test_answers_to_unknown_questions_are_rejected(client):
+    run_id = client.post("/api/demos/boutique-delivery/run", json={}).json()["run_id"]
+    wait_status(client, run_id, ("waiting_answers", "failed"))
+    r = client.post(f"/api/runs/{run_id}/answers", json={"answers": {"Q-1": "Да", "Q-9": "Нет такого"}})
+    assert r.status_code == 422
+    assert "Q-9" in r.json()["detail"]
+    assert client.get(f"/api/runs/{run_id}").json()["status"] == "waiting_answers"
+
+
 def test_upload_run_and_edit_result(client):
     files = [("contracts", ("courier.proto", open("../demo/boutique-delivery/contracts/courier.proto", "rb")))]
     form = {"title": "Доставка", "text": "Создавать отправление после оплаты.\n\nПоказывать стоимость.",

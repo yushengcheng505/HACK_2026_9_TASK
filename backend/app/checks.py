@@ -17,7 +17,12 @@ from app.schemas import (
 )
 
 DUPLICATE_SIMILARITY = 0.7
-STORY_FORMAT = re.compile(r"^\s*Как\s+.+?,\s*я\s+хочу\s+.+?,\s*чтобы\s+.+", re.I | re.S)
+SHARED_IDENT_SIMILARITY = 0.3
+STORY_FORMAT = re.compile(r"^\s*Как\s+.+?,\s*я\s+хочу,?\s+.+?,\s*чтобы\s+.+", re.I | re.S)
+IDENT = re.compile(r"[A-Za-z][A-Za-z0-9_.\-/{}]*[A-Za-z0-9_}]")
+COMMON_IDENTS = {"api", "courier", "grpc", "rpc", "rest", "http", "json", "get", "post", "put", "patch", "delete",
+                 "frontend", "backend", "postgresql", "redis", "kubernetes", "loki", "go"}
+TYPE_GROUPS = {"integration": "backend"}
 
 
 def is_test_task(task: Task) -> bool:
@@ -28,8 +33,41 @@ def _stems(title: str) -> set[str]:
     return {w[:6] for w in re.findall(r"\w+", title.lower()) if len(w) > 2}
 
 
-def _similar(a: set[str], b: set[str]) -> bool:
-    return bool(a and b) and len(a & b) / len(a | b) >= DUPLICATE_SIMILARITY
+def _idents(title: str) -> set[tuple[str | None, str]]:
+    """Технические объекты из названия: (сервис или None, метод/таблица/файл/путь/секрет)."""
+    result = set()
+    for token in IDENT.findall(title):
+        token = token.lower()
+        head, _, tail = token.partition(".")
+        service = head if head.endswith("service") and tail else None
+        name = tail if service else token
+        if not name.endswith("service") and name not in COMMON_IDENTS:
+            result.add((service, name))
+    return result
+
+
+def _share_ident(a: set[tuple[str | None, str]], b: set[tuple[str | None, str]]) -> bool:
+    return any(na == nb and (sa is None or sb is None or sa == sb) for sa, na in a for sb, nb in b)
+
+
+def _op_name(op_id: str) -> str:
+    """«PROTO:CourierService.PrintLabel» → «printlabel», «API:GET /v1/x/{id}» → «/v1/x/{id}»."""
+    body = op_id.split(":", 1)[-1]
+    return (body.split(" ", 1)[-1] if " " in body else body.rsplit(".", 1)[-1]).lower()
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    return len(a & b) / len(a | b) if a and b else 0.0
+
+
+def _duplicates(a: Task, b: Task) -> bool:
+    if TYPE_GROUPS.get(a.type, a.type) != TYPE_GROUPS.get(b.type, b.type):
+        return False
+    similarity = _jaccard(_stems(a.title), _stems(b.title))
+    ids_a, ids_b = _idents(a.title), _idents(b.title)
+    if ids_a and ids_b:
+        return _share_ident(ids_a, ids_b) and similarity >= SHARED_IDENT_SIMILARITY
+    return similarity >= DUPLICATE_SIMILARITY
 
 
 def run_checks(sources: list[Source], requirements: list[Requirement], stories: list[Story]) -> tuple[list[Issue], Coverage]:
@@ -61,19 +99,20 @@ def run_checks(sources: list[Source], requirements: list[Requirement], stories: 
         if not story.tasks:
             issue("story_without_tasks", "error", story.id, "У истории нет технических задач")
 
-    seen: list[tuple[Task, set[str]]] = []
+    task_story = {t.id: s.id for s in stories for t in s.tasks}
+    seen: list[Task] = []
     for task in tasks:
         if not task.requirement_ids:
             issue("task_without_requirement", "error", task.id, "Задача не обоснована ни одним требованием")
         if task.type == "qa" and not task.test_scenarios:
             issue("qa_without_scenarios", "warning", task.id, "Задача на тестирование без тест-сценариев")
-        stems = _stems(task.title)
-        original = next((t for t, other in seen if _similar(stems, other)), None)
+        original = next((t for t in seen if _duplicates(t, task)), None)
         if original:
             issue("duplicate_task", "warning", task.id,
-                  f"Дублирует задачу {original.id} «{original.title}» — убери повтор или уточни отличие")
+                  f"Возможный дубль задачи {original.id} ({task_story[original.id]}) «{original.title}» — "
+                  "если это одна работа, оставь её в одной истории; если нет, уточни отличие в названии")
         else:
-            seen.append((task, stems))
+            seen.append(task)
 
     reqs_in_stories = {r for s in stories for r in s.requirement_ids}
     reqs_in_tasks = {r for t in tasks for r in t.requirement_ids}
@@ -87,10 +126,11 @@ def run_checks(sources: list[Source], requirements: list[Requirement], stories: 
     ops = [s.id for s in sources if s.kind in CONTRACT_OP_KINDS]
     used_by_reqs = {ref for r in requirements for ref in r.source_refs}
     used_by_tasks = {ref for t in tasks for ref in t.source_refs}
+    named_by_tasks = {op for t in tasks for op in t.source_refs if _op_name(op) in t.title.lower()}
     tested = {ref for t in tasks if is_test_task(t) for ref in t.source_refs}
-    used = [op for op in ops if op in used_by_reqs or op in used_by_tasks]
-    ops_without_tasks = [op for op in ops if op in used_by_reqs and op not in used_by_tasks]
-    ops_without_tests = [op for op in ops if (op in used_by_reqs or op in used_by_tasks) and op not in tested]
+    used = [op for op in ops if op in used_by_reqs or op in named_by_tasks]
+    ops_without_tasks = [op for op in used if op not in used_by_tasks]
+    ops_without_tests = [op for op in used if op not in tested]
     for op in ops_without_tasks:
         issue("op_without_tasks", "error", op, "Операция контракта нужна требованиям, но нет задачи на её реализацию")
     for op in ops_without_tests:
@@ -103,7 +143,7 @@ def run_checks(sources: list[Source], requirements: list[Requirement], stories: 
         tasks_without_requirements=[t.id for t in tasks if not t.requirement_ids],
         unknown_refs=unknown_refs,
         contract_ops_used=used,
-        contract_ops_unused=[op for op in ops if op not in used_by_reqs and op not in used_by_tasks],
+        contract_ops_unused=[op for op in ops if op not in used],
         ops_without_tasks=ops_without_tasks,
         ops_without_tests=ops_without_tests,
     )

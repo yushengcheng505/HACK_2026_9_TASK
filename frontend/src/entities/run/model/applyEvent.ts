@@ -213,6 +213,50 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         log: pushLog(view, line(e, `${task.id} [${task.type}] ${task.title}`, 'dim')),
       }
     }
+    case 'tasks_failed':
+      return {
+        ...next,
+        log: pushLog(view, line(e, `${d.story_id as string}: модель не дала задачи — ${d.error as string}`, 'hazard')),
+      }
+    case 'llm_retry':
+      return {
+        ...next,
+        log: pushLog(view, line(e, `${d.node as string}: повтор запроса, попытка ${d.attempt as number} — ${d.reason as string}`, 'amber')),
+      }
+    case 'findings_collected': {
+      const found = d.findings as { verdict: string }[]
+      const filtered = found.filter((f) => f.verdict === 'rejected_by_filter').length
+      const round = d.round as number
+      return {
+        ...next,
+        log: pushLog(view, line(e, `${round ? `Проверка, круг ${round}` : 'Пробелы'}: находок ${found.length}, отсеяно фильтром ${filtered}`, 'dim')),
+      }
+    }
+    case 'findings_judged': {
+      const verdicts = d.verdicts as { verdict: string }[]
+      const count = (v: string) => verdicts.filter((x) => x.verdict === v).length
+      const text = `Скептик: подтверждено ${count('confirmed')}, понижено ${count('downgraded')}, отклонено ${count('rejected')}`
+      return { ...next, log: pushLog(view, line(e, d.error ? `${text} (скептик не ответил)` : text, d.error ? 'hazard' : 'brand')) }
+    }
+    case 'findings_resolution': {
+      const items = d.items as { resolution: string | null }[]
+      const open = items.filter((i) => i.resolution === 'not_resolved').length
+      return { ...next, log: pushLog(view, line(e, `Решённость: проверено ${items.length}, не решено ${open}`, open ? 'amber' : 'brand')) }
+    }
+    case 'tasks_removed': {
+      const storyId = d.story_id as string
+      const removed = new Set(d.task_ids as string[])
+      return {
+        ...next,
+        stories: view.stories.map((s) => (s.id === storyId ? { ...s, tasks: s.tasks.filter((t) => !removed.has(t.id)) } : s)),
+        log: pushLog(view, line(e, `${storyId}: удалено кодом ${[...removed].join(', ')} по ${d.finding_id as string}`, 'amber')),
+      }
+    }
+    case 'review_skipped':
+      return {
+        ...next,
+        log: pushLog(view, line(e, `Не проверено: ${d.step as string}${d.story_id ? ` ${d.story_id as string}` : ''} — ${d.reason as string}`, 'hazard')),
+      }
     case 'checks_finished': {
       const issues = d.issues as Issue[]
       const coverage = d.coverage as Coverage

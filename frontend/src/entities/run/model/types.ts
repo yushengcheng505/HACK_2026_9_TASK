@@ -98,6 +98,30 @@ export interface Stats {
   issues_count: number
 }
 
+export interface Finding {
+  id: string
+  source: 'reviewer' | 'editor' | 'simplifier' | 'analyst'
+  round: number
+  kind: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  confidence: number
+  story_ids: string[]
+  task_ids: string[]
+  scenario: string
+  evidence: { where: string; ref: string; quote: string }[]
+  fix: string
+  verdict: 'pending' | 'confirmed' | 'downgraded' | 'rejected' | 'rejected_by_filter' | 'deferred'
+  verdict_reason: string
+  resolution: 'fixed' | 'disputed' | 'resolved' | 'not_resolved' | null
+  resolution_note: string
+}
+
+export interface ReviewSkip {
+  step: string
+  story_id: string | null
+  reason: string
+}
+
 export interface Decomposition {
   epic: { title: string; text: string; label: string }
   target_language: Language
@@ -108,6 +132,8 @@ export interface Decomposition {
   assumptions: string[]
   gaps: Gap[]
   issues: Issue[]
+  findings?: Finding[]
+  review_skipped?: ReviewSkip[]
   coverage: Coverage
   stats: Stats
   model: string

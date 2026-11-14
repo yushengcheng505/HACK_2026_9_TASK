@@ -28,6 +28,13 @@ uv run langgraph dev        # граф в LangGraph Studio (нужен паке�
 
 Промпты — `prompts/*.md`. Версия (хеш) каждого промпта сохраняется с запуском.
 
+## Проверка результата
+`REVIEW_MODE=review` (по умолчанию): рецензент на каждую историю, редактор стыков, упрощатель,
+фильтр находок кодом и скептик; подробности — `../docs/superpowers/specs/2026-11-14-review-workflow-design.md`.
+`REVIEW_MODE=critic` — прежний один критик (для сравнения). `REVIEW_SKEPTIC` и `REVIEW_SIMPLIFIER`
+(`true`/`false`) включают скептика и упрощателя. Журнал находок с вердиктами — поле `findings`
+результата и лист «Проверка» в XLSX.
+
 ## Быстрая проверка
 ```bash
 curl -X POST localhost:8000/api/demos/boutique-delivery/run -H 'content-type: application/json' -d '{}'

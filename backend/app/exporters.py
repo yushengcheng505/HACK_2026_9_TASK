@@ -10,7 +10,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from app.schemas import Decomposition, Story, Task
+from app.schemas import Decomposition, Finding, Story, Task
 
 BRAND = "0B5CAD"
 STORY_FILL = "DCE8F7"
@@ -19,6 +19,10 @@ STORY_COLUMNS = ["Вид", "ID", "Родитель", "Заголовок", "Ти
                  "Критерии приёмки / DoD", "Требования", "Источники", "Тест-сценарии"]
 SEVERITY = {"error": "Ошибка", "warning": "Предупреждение", "info": "Инфо"}
 REQ_TYPES = {"functional": "Функциональное", "integration": "Интеграционное", "nonfunctional": "Нефункциональное"}
+ROLES = {"reviewer": "Рецензент", "editor": "Редактор стыков", "simplifier": "Упрощатель", "analyst": "Аналитик"}
+VERDICTS = {"confirmed": "подтверждено", "downgraded": "понижено", "rejected": "отклонено",
+            "rejected_by_filter": "отсеяно фильтром", "deferred": "отложено", "pending": "не проверено"}
+RESOLUTIONS = {"fixed": "исправлено", "disputed": "оспорено", "resolved": "решено", "not_resolved": "не решено"}
 
 
 def to_json(d: Decomposition) -> bytes:
@@ -56,6 +60,18 @@ def _sheet(wb: Workbook, title: str, header: list[str], rows: list[list], widths
     if rows:
         ws.auto_filter.ref = ws.dimensions
     return ws
+
+
+def _resolution(f: Finding) -> str:
+    text = RESOLUTIONS.get(f.resolution or "", "—")
+    return f"{text}: {f.resolution_note}" if f.resolution_note else text
+
+
+def _open_findings(d: Decomposition) -> tuple[list[Finding], list[Finding]]:
+    """Нерешённые подтверждённые и пожелания (отложенные и пониженные)."""
+    unresolved = [f for f in d.findings if f.verdict == "confirmed" and f.resolution not in ("fixed", "resolved")]
+    wishes = [f for f in d.findings if f.verdict in ("deferred", "downgraded")]
+    return unresolved, wishes
 
 
 def to_xlsx(d: Decomposition) -> bytes:
@@ -103,6 +119,15 @@ def to_xlsx(d: Decomposition) -> bytes:
     qa_rows += [["Пробел", g.id, g.text, g.risk, ", ".join(g.source_refs)] for g in d.gaps]
     _sheet(wb, "Вопросы и пробелы", ["Вид", "ID", "Текст", "Варианты / риск", "Ответ / источники"], qa_rows,
            [12, 9, 60, 45, 40])
+
+    _sheet(wb, "Проверка", ["ID", "Круг", "Роль", "Вид", "Уровень", "Истории", "Задачи", "Сценарий", "Исправление",
+                            "Вердикт", "Обоснование", "Решено"],
+           [[f.id, f.round, ROLES.get(f.source, f.source), f.kind, f.severity, ", ".join(f.story_ids),
+             ", ".join(f.task_ids), f.scenario, f.fix, VERDICTS.get(f.verdict, f.verdict), f.verdict_reason,
+             _resolution(f)] for f in d.findings]
+           + [["не проверено", "", r.step, "", "", r.story_id or "", "", r.reason, "", "", "", ""]
+              for r in d.review_skipped],
+           [8, 6, 16, 22, 10, 14, 18, 50, 40, 16, 40, 30])
 
     s = d.stats
     _sheet(wb, "Статистика", ["Показатель", "Значение"], [
@@ -211,6 +236,19 @@ def to_docx(d: Decomposition) -> bytes:
         doc.add_paragraph()
         _table(doc, ["Уровень", "Объект", "Замечание"],
                [[SEVERITY[i.severity], i.target_id, i.message] for i in d.issues])
+
+    unresolved, wishes = _open_findings(d)
+    if unresolved or wishes or d.review_skipped:
+        doc.add_heading("Замечания проверки", level=1)
+        for title, items in (("Нерешённые замечания", unresolved), ("Пожелания", wishes)):
+            if items:
+                doc.add_paragraph().add_run(title).bold = True
+                _table(doc, ["ID", "Уровень", "Задачи", "Замечание", "Статус"],
+                       [[f.id, f.severity, ", ".join(f.task_ids or f.story_ids), f"{f.scenario}\n{f.fix}".strip(),
+                         _resolution(f)] for f in items])
+        if d.review_skipped:
+            doc.add_paragraph().add_run("Не проверено").bold = True
+            _bullets(doc, [f"{r.step}{' ' + r.story_id if r.story_id else ''}: {r.reason}" for r in d.review_skipped])
 
     errors = sum(i.severity == "error" for i in d.issues)
     doc.add_paragraph()

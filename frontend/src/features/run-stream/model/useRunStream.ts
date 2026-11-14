@@ -7,7 +7,8 @@ const EVENT_TYPES = [
   'run_started', 'node_started', 'node_finished', 'sources_parsed', 'language_detected', 'token',
   'requirement_created', 'gap_found', 'questions_asked', 'waiting_answers', 'answers_received',
   'story_created', 'tasks_replaced', 'task_created', 'checks_finished', 'critic_feedback',
-  'run_finished', 'run_failed', 'result_edited',
+  'run_finished', 'run_failed', 'result_edited', 'tasks_failed', 'llm_retry',
+  'findings_collected', 'findings_judged', 'findings_resolution', 'tasks_removed', 'review_skipped',
 ] as const
 
 const TERMINAL = new Set(['run_finished', 'run_failed'])

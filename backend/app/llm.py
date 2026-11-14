@@ -14,6 +14,7 @@ from app.prompts import load_prompt
 
 T = TypeVar("T", bound=BaseModel)
 OnToken = Callable[[str, str], None]
+OnRetry = Callable[[int, str], None]
 MAX_ATTEMPTS = 3
 EMPTY_RETRY = ("Ответ пустой: похоже, лимит токенов ушёл на рассуждения. "
                "Не рассуждай подробно — сразу верни JSON строго по схеме.")
@@ -26,7 +27,8 @@ class LLMError(RuntimeError):
 class LLM(Protocol):
     model: str
 
-    async def complete_json(self, prompt_name: str, user: str, schema: type[T], on_token: OnToken | None = None) -> T: ...
+    async def complete_json(self, prompt_name: str, user: str, schema: type[T], on_token: OnToken | None = None,
+                            on_retry: OnRetry | None = None) -> T: ...
 
 
 def extract_json(text: str) -> object:
@@ -98,13 +100,16 @@ class OpenAICompatLLM:
                     on_token(delta.content, "content")
         return "".join(parts), finish_reason
 
-    async def complete_json(self, prompt_name: str, user: str, schema: type[T], on_token: OnToken | None = None) -> T:
+    async def complete_json(self, prompt_name: str, user: str, schema: type[T], on_token: OnToken | None = None,
+                            on_retry: OnRetry | None = None) -> T:
         messages = [
             {"role": "system", "content": load_prompt(prompt_name).text + schema_instruction(schema)},
             {"role": "user", "content": user},
         ]
         last_error = ""
-        for _ in range(MAX_ATTEMPTS):
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            if attempt > 1 and on_retry:
+                on_retry(attempt, last_error)
             text, finish_reason = await self._chat(messages, schema, on_token)
             if not text.strip():
                 last_error = f"пустой ответ (finish_reason={finish_reason})"

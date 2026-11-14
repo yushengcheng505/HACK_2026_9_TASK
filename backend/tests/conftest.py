@@ -13,5 +13,7 @@ os.environ.update({
     "LLM_API_KEY_ENV": "",
     "LLM_JSON_MODE": "json_schema",
     "LLM_EXTRA_BODY": "{}",
+    "LLM_CONCURRENCY": "1",
+    "CRITIC_ROUNDS": "2",
     "DATA_DIR": DATA_DIR,
 })
