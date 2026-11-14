@@ -38,7 +38,7 @@ export function ConsoleShell({ route, bare = false, children }: ConsoleShellProp
                 key={item.index}
                 href={routeHref(item.route)}
                 aria-current={active ? 'page' : undefined}
-                className={`press flex items-center gap-3 rounded-[2px] px-3 py-2.5 ${
+                className={`press flex items-center gap-3 rounded-xl px-3 py-2.5 ${
                   active ? 'bg-panel text-brand' : 'text-fg-muted hover:bg-surface hover:text-fg'
                 }`}
               >
