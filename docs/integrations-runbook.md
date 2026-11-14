@@ -34,6 +34,31 @@
 `LLM_BASE_URL`, `LLM_API_KEY_ENV`, `LLM_MODEL`, `JIRA_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`, `JIRA_PROJECT`,
 `BITBUCKET_WEBHOOK_SECRET`. Без Jira-переменных кнопка «В Jira» скрыта, без секрета вебхук не проверяет подпись.
 
+## Боевой стенд (Debian)
+
+- Сервер `31.77.251.162` (Debian 13, 2 CPU, 4 ГБ), вход `ssh root@31.77.251.162` по ключу.
+- Интерфейс: http://31.77.251.162/ , пульт — http://31.77.251.162/console/ . Наружу открыт только порт 80
+  (nginx); HAProxy (`:8081`, статистика `:8404`) — только с самого сервера: `ssh -L 8404:127.0.0.1:8404 root@31.77.251.162`.
+- Проект — `/opt/synaps` (клон GitHub), настройки — `/opt/synaps/backend/.env` (секреты) и `/opt/synaps/deploy/.env`
+  (адреса моделей, порт). Данные — том Docker `deploy_backend-data`; туда перенесена локальная база с прогонами.
+- Вебхук Bitbucket смотрит на `http://31.77.251.162/api/webhooks/bitbucket`, туннель не нужен.
+- Контейнеры с `restart: unless-stopped` — поднимаются сами после перезагрузки.
+
+Обновить код:
+
+```bash
+ssh root@31.77.251.162 'cd /opt/synaps && git pull && cd deploy && docker compose up -d --build'
+```
+
+Подключить модель на другой машине (vLLM или llama-server, OpenAI-совместимый API):
+1. В `/opt/synaps/deploy/.env` — `LLM_PRIMARY=<ip>:<порт>` и `LLM_BACKUP=<ip>:<порт>` (резерв; если его нет —
+   тот же адрес). Порт модели на той машине должен быть открыт для `31.77.251.162`.
+2. В `/opt/synaps/backend/.env` — `LLM_MODEL=<имя модели, как его отдаёт /v1/models>`; для Qwen на vLLM ещё
+   `LLM_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}` и при vLLM `LLM_CONCURRENCY=4`.
+3. `cd /opt/synaps/deploy && docker compose up -d --force-recreate haproxy backend`
+4. Проверка: `curl -s localhost:8081/v1/models` на сервере и `/api/health` — `llm_host: haproxy:8081`,
+   в статистике HAProxy primary — UP.
+
 ## Как проверить каждое звено
 
 ```bash
