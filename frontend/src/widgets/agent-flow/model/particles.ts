@@ -42,6 +42,7 @@ interface Snapshot {
   findings: number
   feedback: number
   coverage: RunView['coverage']
+  planned: boolean
   status: RunView['status']
 }
 
@@ -54,6 +55,7 @@ const snapshot = (view: RunView): Snapshot => ({
   findings: view.findings.length,
   feedback: view.feedback.length,
   coverage: view.coverage,
+  planned: Boolean(view.architecture),
   status: view.status,
 })
 
@@ -78,6 +80,7 @@ export function useParticles(view: RunView, api: RefObject<ParticleApi | null>, 
         // До генераторов историю «доносит» сам робот при рождении — здесь только путь от Аналитика.
         burst('an-st', view.stories.slice(before.stories).map((s) => s.id), 'mint')
       }
+      if (now.planned && !before.planned) view.stories.forEach((s, i) => fx.send(`st-gen:${s.id}`, 'ПЛАН', 'brand', i * 60))
       for (const s of view.stories) {
         const fresh = s.tasks.filter((t) => !before.tasks.has(t.id)).map((t) => t.id)
         if (fresh.length) burst(`gen-gate:${s.id}`, fresh, 'brand')

@@ -43,10 +43,10 @@ def test_plan_problems_catch_seams():
     assert any(p.startswith("PROTO:CourierService.CreateShipment: в story") for p in plan_problems(wrong, OPS, reqs, STORIES))
 
 
-async def test_architect_is_off_by_default():
+async def test_architect_can_be_disabled():
     llm = FakeLLM()
     graph = build_graph(InMemorySaver())
-    config = {"configurable": {"thread_id": "a0", "llm": llm}}
+    config = {"configurable": {"thread_id": "a0", "llm": llm, "architect": False}}
     await run(graph, demo_input(skip_questions=True), config)
     result = Decomposition.model_validate((await graph.aget_state(config)).values["result"])
     assert result.architecture is None and not llm.calls["architect"]

@@ -1,4 +1,4 @@
-import { AGENTS } from '@/entities/agent'
+import { ROSTER } from '@/entities/agent'
 import type { AgentId } from '@/entities/agent'
 import type { RunView, StreamRun } from '@/entities/run'
 
@@ -19,7 +19,7 @@ export interface AgentInstance {
 /** Поток моложе этого — агент «сейчас пишет». */
 export const LIVE_MS = 2500
 
-export const AGENT_NAME = Object.fromEntries(AGENTS.map((a) => [a.id, a.name])) as Record<AgentId, string>
+export const AGENT_NAME = Object.fromEntries(ROSTER.map((a) => [a.id, a.name])) as Record<AgentId, string>
 
 export const AGENT_ABOUT: Record<AgentId, string> = {
   requirements: 'Выделяет из эпика, документации и контрактов атомарные требования со ссылками на источники.',
@@ -46,6 +46,10 @@ export function lastRun(view: RunView, keys: string[]): StreamRun | undefined {
 
 const failureOf = (view: RunView, keys: string[]) => keys.map((k) => view.calls[k]?.failure).find(Boolean) ?? null
 
+/** Архитектор виден, если прогон запущен с ним или его план уже есть; старые записи и прогоны без него рисуются без него. */
+export const hasArchitect = (view: RunView) =>
+  view.architectEnabled || Boolean(view.architecture) || view.nodes.architect.phase !== 'idle'
+
 /** Проверка шла в старом режиме одного критика — рецензентов, стыков и упрощателя не было. */
 export const isLegacyReview = (view: RunView) => Boolean(view.calls.critic)
 
@@ -66,11 +70,13 @@ function byCall(view: RunView, keys: string[], round: number, now: number, targe
   return targeted ? 'queued' : run ? 'done' : 'idle'
 }
 
-function single(view: RunView, kind: 'requirements' | 'analyst' | 'stories'): AgentStatus {
+function single(view: RunView, kind: 'requirements' | 'analyst' | 'stories' | 'architect'): AgentStatus {
   const phase = view.nodes[kind].phase
   if (kind === 'analyst' && view.waitingAnswers) return 'waiting'
   if (phase === 'active') return view.status === 'failed' ? 'failed' : view.status === 'paused' ? 'paused' : 'working'
   if (phase === 'done') return 'done'
+  // План пришёл с результатом, а узлов в записи нет — Архитектор своё отработал.
+  if (kind === 'architect' && view.architecture) return 'done'
   return 'idle'
 }
 
@@ -82,6 +88,7 @@ export function buildInstances(view: RunView, now: number): AgentInstance[] {
   add('requirements', 'requirements', single(view, 'requirements'), ['requirements'])
   add('analyst', 'analyst', single(view, 'analyst'), ['analyst'])
   add('stories', 'stories', single(view, 'stories'), ['stories'])
+  add('architect', 'architect', single(view, 'architect'), ['architect'])
 
   const tasks = view.nodes.tasks
   for (const s of view.stories) {

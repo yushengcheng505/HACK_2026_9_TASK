@@ -11,15 +11,40 @@ export const RESULT = { w: 132, h: 150 } as const
 
 const PAD = { left: 28, right: 28, top: 64, bottom: 76 } as const
 /**
- * Расстояния между центрами соседних колонок. Между генераторами задач и ОТК — место под границу
- * двух групп, между рецензентами и Редактором стыков — под шину находок.
+ * Расстояния от центра колонки до центра следующей. Между генераторами задач и ОТК — место под границу
+ * двух групп, между рецензентами и Редактором стыков — под шину находок, перед генераторами — под входную шину.
  */
-const GAPS = [188, 188, 214, 124, 120, 224, 198, 198] as const
+const GAP_AFTER: Record<Column, number> = {
+  requirements: 188,
+  analyst: 188,
+  stories: 188,
+  architect: 214,
+  tasks: 124,
+  gate: 120,
+  reviewer: 224,
+  side: 198,
+  skeptic: 198,
+  result: 0,
+}
 /** Коридор между Редактором стыков и Упрощателем: через него шина находок идёт к Скептику. */
 const CORRIDOR = 56
 
-export type Column = 'requirements' | 'analyst' | 'stories' | 'tasks' | 'gate' | 'reviewer' | 'side' | 'skeptic' | 'result'
-const COLUMNS: Column[] = ['requirements', 'analyst', 'stories', 'tasks', 'gate', 'reviewer', 'side', 'skeptic', 'result']
+export type Column = 'requirements' | 'analyst' | 'stories' | 'architect' | 'tasks' | 'gate' | 'reviewer' | 'side' | 'skeptic' | 'result'
+const columnsOf = (withArchitect: boolean): Column[] => [
+  'requirements',
+  'analyst',
+  'stories',
+  ...(withArchitect ? (['architect'] as const) : []),
+  'tasks',
+  'gate',
+  'reviewer',
+  'side',
+  'skeptic',
+  'result',
+]
+
+/** Без Архитектора за Автором историй сразу идут генераторы: расстояние до них прежнее. */
+const gapAfter = (c: Column, withArchitect: boolean) => (c === 'stories' && !withArchitect ? 214 : GAP_AFTER[c])
 
 export interface Box {
   x: number
@@ -82,20 +107,22 @@ function curve(x1: number, y1: number, x2: number, y2: number): string {
 
 
 /** Ширина мира: от левого края карточки Составителя до правого края Итога. */
-export const FLOW_WIDTH = PAD.left + CARD.w / 2 + GAPS.reduce((a, b) => a + b, 0) + RESULT.w / 2 + PAD.right
+export const flowWidth = (withArchitect: boolean) =>
+  PAD.left + CARD.w / 2 + columnsOf(withArchitect).reduce((sum, c) => sum + gapAfter(c, withArchitect), 0) + RESULT.w / 2 + PAD.right
 
 /** Высота мира: растёт с числом историй. */
 export const flowHeight = (stories: number) => Math.max(stories * 62 + 330, 600)
 
-export function layoutFlow(storyIds: string[]): FlowLayout {
-  const width = FLOW_WIDTH
+export function layoutFlow(storyIds: string[], withArchitect: boolean): FlowLayout {
+  const width = flowWidth(withArchitect)
   const height = flowHeight(storyIds.length)
   const col = {} as Record<Column, number>
   let x = PAD.left + CARD.w / 2
-  COLUMNS.forEach((c, i) => {
+  columnsOf(withArchitect).forEach((c) => {
     col[c] = x
-    if (i < GAPS.length) x += GAPS[i]
+    x += gapAfter(c, withArchitect)
   })
+  if (!withArchitect) col.architect = col.stories
 
   const areaTop = PAD.top
   const areaBottom = height - PAD.bottom
@@ -111,6 +138,7 @@ export function layoutFlow(storyIds: string[]): FlowLayout {
     requirements: { x: col.requirements, y: mid, w: CARD.w, h: CARD.h },
     analyst: { x: col.analyst, y: mid, w: CARD.w, h: CARD.h },
     stories: { x: col.stories, y: mid, w: CARD.w, h: CARD.h },
+    ...(withArchitect ? { architect: { x: col.architect, y: mid, w: CARD.w, h: CARD.h } } : {}),
     junction: { x: col.side, y: mid - CORRIDOR / 2 - CARD.h / 2, w: CARD.w, h: CARD.h },
     simplifier: { x: col.side, y: mid + CORRIDOR / 2 + CARD.h / 2, w: CARD.w, h: CARD.h },
     skeptic: { x: col.skeptic, y: mid, w: CARD.w, h: CARD.h },
@@ -129,13 +157,16 @@ export function layoutFlow(storyIds: string[]): FlowLayout {
   const flow = (id: string, from: string, to: string, d: string) => edges.push({ id, from, to, d, kind: 'flow' })
   const req = boxes.requirements
   const sk = boxes.skeptic
+  /** Откуда расходится входная шина генераторов: Архитектор, а без него — Автор историй. */
+  const source = withArchitect ? boxes.architect : boxes.stories
   const jn = boxes.junction
   const sp = boxes.simplifier
   flow('prep', 'prep', 'requirements', `M ${req.x} 0 C ${req.x} ${areaTop * 0.6}, ${req.x} ${top(req) - 30}, ${req.x} ${top(req)}`)
   flow('req-an', 'requirements', 'analyst', curve(right(req), mid, left(boxes.analyst), mid))
   flow('an-st', 'analyst', 'stories', curve(right(boxes.analyst), mid, left(boxes.stories), mid))
+  if (withArchitect) flow('st-arch', 'stories', 'architect', curve(right(boxes.stories), mid, left(boxes.architect), mid))
 
-  // Входная шина генераторов: от Автора историй вертикаль перед колонкой, от неё ветка в каждый ряд.
+  // Входная шина генераторов: от Архитектора (или Автора историй) вертикаль перед колонкой, от неё ветка в каждый ряд.
   // По этой же шине возвращается доработка от Скептика — линии не пересекаются.
   const fanX = col.tasks - CHIP.w / 2 - 26
   // Шина находок: рецензенты сливаются в вертикаль справа от себя, она идёт по коридору к Скептику.
@@ -144,7 +175,7 @@ export function layoutFlow(storyIds: string[]): FlowLayout {
   for (const id of storyIds) {
     const gen = boxes[`tasks:${id}`]
     const rev = boxes[`review:${id}`]
-    flow(`st-gen:${id}`, 'stories', `tasks:${id}`, ortho([[right(boxes.stories), mid], [fanX, mid], [fanX, gen.y], [left(gen), gen.y]]))
+    flow(`st-gen:${id}`, withArchitect ? 'architect' : 'stories', `tasks:${id}`, ortho([[right(source), mid], [fanX, mid], [fanX, gen.y], [left(gen), gen.y]]))
     flow(`gen-gate:${id}`, `tasks:${id}`, 'gate', `M ${right(gen)} ${gen.y} L ${left(gate)} ${gen.y}`)
     flow(`gate-rev:${id}`, 'gate', `review:${id}`, `M ${right(gate)} ${rev.y} L ${left(rev)} ${rev.y}`)
     flow(`rev-sk:${id}`, `review:${id}`, 'skeptic', ortho([[right(rev), rev.y], [busX, rev.y], [busX, mid], [left(sk), mid]]))

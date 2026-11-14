@@ -18,6 +18,7 @@ const NODE_TARGET: Record<PipelineNode, string> = {
   analyst: 'analyst',
   ask_user: 'analyst',
   stories: 'stories',
+  architect: 'architect',
   tasks: 'tasks',
   checks: 'gate',
   critic: 'skeptic',

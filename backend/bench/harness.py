@@ -15,8 +15,8 @@ from app.graph import build_graph
 from app.llm import LLM, OpenAICompatLLM
 from app.prompts import load_prompt
 
-CRITIC = {"review_mode": "critic", "review_skeptic": False, "review_simplifier": False}
-FULL = {"review_mode": "review", "review_skeptic": True, "review_simplifier": True}
+CRITIC = {"review_mode": "critic", "review_skeptic": False, "review_simplifier": False, "architect": False}
+FULL = {"review_mode": "review", "review_skeptic": True, "review_simplifier": True, "architect": False}
 
 Edits = dict[str, tuple[tuple[str, str], ...]]  # роль → правки (было, стало); «было» пустое — дописать в конец
 

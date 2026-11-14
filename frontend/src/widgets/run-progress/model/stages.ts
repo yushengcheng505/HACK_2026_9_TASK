@@ -21,7 +21,7 @@ export interface Stage {
 const NODES: Record<StageId, PipelineNode[]> = {
   prep: ['parse_inputs', 'detect_language'],
   requirements: ['requirements', 'analyst', 'ask_user'],
-  stories: ['stories'],
+  stories: ['stories', 'architect'],
   tasks: ['tasks'],
   review: ['checks', 'critic'],
   result: ['finalize'],
@@ -30,7 +30,7 @@ const ORDER = Object.keys(NODES) as StageId[]
 
 const count = (view: RunView, kind: string) => view.sources.filter((s) => s.kind === kind).length
 /** Сводки узлов, которые добавляют к числам этапа что-то новое (остальные их повторяют). */
-const SUMMARY: Partial<Record<PipelineNode, string>> = { analyst: 'Аналитик', ask_user: 'Вопросы' }
+const SUMMARY: Partial<Record<PipelineNode, string>> = { analyst: 'Аналитик', ask_user: 'Вопросы', architect: 'Архитектор' }
 const summaries = (view: RunView, nodes: PipelineNode[]) =>
   nodes.flatMap((n) => (SUMMARY[n] && view.nodes[n].summary ? [[SUMMARY[n], view.nodes[n].summary] as [string, string]] : []))
 

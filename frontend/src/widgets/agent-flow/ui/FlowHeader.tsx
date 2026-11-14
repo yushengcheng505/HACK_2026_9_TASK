@@ -31,7 +31,7 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
   const elapsed = useElapsed(view.startedAt, view.finishedAt)
   const status = STATUS_LABEL[view.status]
   const ready = view.status === 'done'
-  const canReplay = (view.status !== 'running' && view.status !== 'paused') || replay
+  const canReplay = view.status === 'done' || view.status === 'failed' || replay
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const control = view.status === 'running' ? 'pause' : view.status === 'paused' ? 'resume' : null
@@ -100,21 +100,22 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
         </button>
       )}
 
-      <div className="af-seg" role="group" aria-label="Воспроизвести запись прогона">
-        <span className="af-seg-cap">▶ запись</span>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            disabled={!canReplay}
-            onClick={() => onReplay(s)}
-            title={`Воспроизвести записанный прогон, ускорение ${s}×`}
-            className={`af-seg-item ${replay && speed === s ? 'af-seg-on' : ''}`}
-          >
-            {s}×
-          </button>
-        ))}
-      </div>
+      {canReplay && (
+        <div className="af-seg" role="group" aria-label="Воспроизвести запись прогона">
+          <span className="af-seg-cap">▶ запись</span>
+          {SPEEDS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onReplay(s)}
+              title={`Воспроизвести записанный прогон, ускорение ${s}×`}
+              className={`af-seg-item ${replay && speed === s ? 'af-seg-on' : ''}`}
+            >
+              {s}×
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="af-seg" aria-label="Выгрузка">
         {(['docx', 'xlsx', 'json'] as const).map((fmt) => (

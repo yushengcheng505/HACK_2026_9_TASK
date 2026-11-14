@@ -6,6 +6,7 @@ from typing import Any
 
 from langgraph.types import Command
 
+from app.config import get_settings
 from app.limiter import Limiter
 from app.llm import LLM
 from app.prompts import prompt_snapshot
@@ -49,7 +50,8 @@ class Runner:
         self.store.update_run(run_id, model=llm.model,
                               prompt_versions={name: p.version for name, p in prompts.items()})
         self.publish(run_id, "run_started", {"run_id": run_id, "epic": {"title": payload["title"]},
-                                             "model": llm.model, "concurrency": self.limiter(run_id).limit})
+                                             "model": llm.model, "concurrency": self.limiter(run_id).limit,
+                                             "architect": get_settings().architect})
         self._spawn(run_id, payload)
 
     def resume(self, run_id: str, answers: dict[str, str], llm: LLM | None = None) -> None:

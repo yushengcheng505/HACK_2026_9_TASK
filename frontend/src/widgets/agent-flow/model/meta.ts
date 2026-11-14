@@ -13,8 +13,12 @@ export function metaFor(inst: AgentInstance, view: RunView): string {
       return view.gaps.length || view.questions.length ? `${view.gaps.length} проб. · ${view.questions.length} вопр.` : ''
     case 'stories':
       return view.stories.length ? `${view.stories.length} ${plural(view.stories.length, 'история', 'истории', 'историй')}` : ''
-    case 'architect':
-      return ''
+    case 'architect': {
+      const plan = view.architecture
+      if (!plan) return ''
+      const n = plan.external_calls.length
+      return `${plan.services.length} ${plural(plan.services.length, 'сервис', 'сервиса', 'сервисов')} · ${n} ${plural(n, 'вызов', 'вызова', 'вызовов')}`
+    }
     case 'tasks': {
       const n = view.stories.find((s) => s.id === inst.storyId)?.tasks.length ?? 0
       const redo = view.feedback.filter((f) => f.notes.some((x) => x.story_id === inst.storyId)).length

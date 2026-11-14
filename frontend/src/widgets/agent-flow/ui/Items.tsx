@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { REQ_TYPE, TASK_TYPE } from '@/entities/run'
-import type { Finding, Requirement, Story, Task } from '@/entities/run'
+import type { ArchitecturePlan, Finding, Requirement, Story, Task } from '@/entities/run'
 
 export function Section({ title, count, children }: { title: string; count?: number | string; children: ReactNode }) {
   return (
@@ -125,5 +125,77 @@ export function Note({ title, children, tone = 'amber' }: { title: string; child
       <div className="af-note-title">{title}</div>
       <div className="af-note-body">{children}</div>
     </div>
+  )
+}
+
+const cited = (basis: unknown[]) => (basis.length ? 'по источнику' : 'предположение')
+
+/** План Архитектора: кто что вызывает, как связаны сервисы, где данные; у каждого пункта видно, на чём он основан. */
+export function Architecture({ plan, problems }: { plan: ArchitecturePlan; problems: string[] }) {
+  return (
+    <>
+      {problems.length > 0 && (
+        <Note title={`Замечания кода к плану · ${problems.length}`}>
+          <ul className="flex flex-col gap-1">
+            {problems.map((p) => (
+              <li key={p}>— {p}</li>
+            ))}
+          </ul>
+        </Note>
+      )}
+      <Section title="Сервисы" count={plan.services.length}>
+        <ul className="af-list">
+          {plan.services.map((x) => (
+            <Line key={x.name} id={x.name} tag={cited(x.basis)}>
+              {x.role}
+            </Line>
+          ))}
+        </ul>
+      </Section>
+      <Section title="Внешние вызовы" count={plan.external_calls.length}>
+        <ul className="af-list">
+          {plan.external_calls.map((x) => (
+            <Line key={x.op} id={x.op} tag={x.story || cited(x.basis)}>
+              вызывает <b className="text-fg">{x.service}</b> · таймаут {x.timeout_ms} мс · повтор {x.retry === 'unsafe' ? 'небезопасен' : 'безопасен'}
+              {x.note && <span className="af-line-sub">{x.note}</span>}
+            </Line>
+          ))}
+        </ul>
+      </Section>
+      {plan.links.length > 0 && (
+        <Section title="Связи сервисов" count={plan.links.length}>
+          <ul className="af-list">
+            {plan.links.map((x) => (
+              <Line key={`${x.caller}-${x.callee}-${x.method}`} id={x.method} tag={x.new ? `новый · ${x.story || '—'}` : cited(x.basis)}>
+                {x.caller} → {x.callee}
+                <span className="af-line-sub">{x.purpose}</span>
+              </Line>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {plan.stores.length > 0 && (
+        <Section title="Хранилища и секреты" count={plan.stores.length}>
+          <ul className="af-list">
+            {plan.stores.map((x) => (
+              <Line key={x.name} id={x.name} tag={x.story || cited(x.basis)}>
+                {x.service}: {x.data}
+              </Line>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {plan.rules.length > 0 && (
+        <Section title="Общие правила" count={plan.rules.length}>
+          <ul className="af-list">
+            {plan.rules.map((r, i) => (
+              <Line key={r} id={`R-${i + 1}`}>
+                {r}
+              </Line>
+            ))}
+          </ul>
+        </Section>
+      )}
+    </>
   )
 }

@@ -122,7 +122,56 @@ export interface ReviewSkip {
   reason: string
 }
 
+export interface Evidence {
+  source_id: string
+  quote: string
+}
+
+export interface ArchitectureService {
+  name: string
+  role: string
+  basis: Evidence[]
+}
+
+export interface ArchitectureCall {
+  op: string
+  service: string
+  timeout_ms: number
+  retry: 'safe' | 'unsafe'
+  note: string
+  story: string
+  basis: Evidence[]
+}
+
+export interface ArchitectureLink {
+  caller: string
+  callee: string
+  method: string
+  new: boolean
+  purpose: string
+  story: string
+  basis: Evidence[]
+}
+
+export interface ArchitectureStore {
+  name: string
+  service: string
+  data: string
+  story: string
+  basis: Evidence[]
+}
+
+/** Общий план интеграции от Архитектора: то, что должно совпасть в задачах разных историй. */
+export interface ArchitecturePlan {
+  services: ArchitectureService[]
+  external_calls: ArchitectureCall[]
+  links: ArchitectureLink[]
+  stores: ArchitectureStore[]
+  rules: string[]
+}
+
 export interface Decomposition {
+  architecture?: ArchitecturePlan | null
   epic: { title: string; text: string; label: string }
   target_language: Language
   sources: SourceRef[]
@@ -170,6 +219,7 @@ export type PipelineNode =
   | 'analyst'
   | 'ask_user'
   | 'stories'
+  | 'architect'
   | 'tasks'
   | 'checks'
   | 'critic'
@@ -236,6 +286,12 @@ export interface RunView {
   finishedAt: number | null
   error: string | null
   language: Language | null
+  /** Прогон запущен с Архитектором (поле `architect` события run_started; в старых записях его нет). */
+  architectEnabled: boolean
+  /** План Архитектора; null — Архитектор не запускался или плана нет. */
+  architecture: ArchitecturePlan | null
+  /** Замечания кода к плану после исправления (пусто — план принят). */
+  architectureProblems: string[]
   sources: SourceRef[]
   contractOps: string[]
   requirements: Requirement[]

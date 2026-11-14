@@ -38,7 +38,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
 
   return (
     <div className="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-ink/80 px-6 py-8 backdrop-blur-[3px]">
-      <div className="fx-enter ticks h-fit w-full max-w-[880px] border border-amber/50 bg-surface">
+      <div className="fx-enter h-fit w-full max-w-[880px] overflow-hidden rounded-[28px] border border-amber/40 bg-surface shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-6 py-5">
           <div className="flex flex-col gap-2">
             <span className="tag flex items-center gap-2 text-amber">
@@ -62,11 +62,13 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
             const c = choices[q.id]
             return (
               <li key={q.id} className="border-b border-line px-6 py-5">
-                <div className="mb-3 flex gap-3">
-                  <span className="font-mono text-[12px] font-bold text-amber">{q.id}</span>
+                <div className="mb-3 flex items-start gap-3">
+                  <span className="mt-[3px] shrink-0 rounded-full border border-amber/40 px-2 py-0.5 font-mono text-[11px] leading-none font-bold whitespace-nowrap text-amber">
+                    {q.id}
+                  </span>
                   <p className="text-[14.5px] leading-relaxed font-semibold text-fg">{q.text}</p>
                 </div>
-                <div className="grid gap-2 pl-10">
+                <div className="grid gap-2 pl-11">
                   {q.options.map((opt, oi) => {
                     const on = c && 'option' in c && c.option === oi
                     return (
@@ -74,7 +76,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
                         key={opt}
                         type="button"
                         onClick={() => setChoices((prev) => ({ ...prev, [q.id]: { option: oi } }))}
-                        className={`press flex cursor-pointer items-start gap-3 border px-3.5 py-2.5 text-left ${
+                        className={`press flex cursor-pointer items-start gap-3 rounded-[14px] border px-3.5 py-2.5 text-left ${
                           on ? 'border-brand bg-panel glow-brand' : 'border-line-strong bg-ink hover:border-line-input'
                         }`}
                       >
@@ -96,7 +98,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
                       })
                     }
                     aria-label={`Свой ответ на ${q.id}`}
-                    className="min-h-10 rounded-[2px] border border-line-strong bg-ink px-3.5 text-[13px] text-fg placeholder:text-fg-dim/60 focus:border-brand"
+                    className="min-h-10 rounded-[14px] border border-line-strong bg-ink px-3.5 text-[13px] text-fg placeholder:text-fg-dim/60 focus:border-brand"
                     tabIndex={0}
                     data-index={qi}
                   />
@@ -112,7 +114,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
             type="button"
             disabled={busy}
             onClick={() => submit(true)}
-            className="press tag cursor-pointer border border-line-input px-4 py-3 text-fg-soft hover:border-amber hover:text-amber disabled:opacity-50"
+            className="press tag cursor-pointer rounded-full border border-line-input px-4 py-3 text-fg-soft hover:border-amber hover:text-amber disabled:opacity-50"
           >
             Пропустить — принять рекомендации
           </button>
@@ -120,7 +122,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
             type="button"
             disabled={busy}
             onClick={() => submit(false)}
-            className="press inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[2px] bg-brand px-5 font-display text-[14px] font-semibold text-ink hover:bg-brand-hover disabled:opacity-60"
+            className="press inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-brand px-5 font-display text-[14px] font-semibold text-ink hover:bg-brand-hover disabled:opacity-60"
           >
             {busy ? 'Отправляю…' : `Ответить и продолжить${answered ? ` (${answered})` : ''}`} <span aria-hidden="true">→</span>
           </button>

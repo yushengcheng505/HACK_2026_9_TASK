@@ -70,5 +70,5 @@ def get_settings() -> Settings:
         review_mode=env("REVIEW_MODE", "review"),
         review_skeptic=_flag(env("REVIEW_SKEPTIC", "true")),
         review_simplifier=_flag(env("REVIEW_SIMPLIFIER", "true")),
-        architect=_flag(env("ARCHITECT", "false")),
+        architect=_flag(env("ARCHITECT", "true")),
     )

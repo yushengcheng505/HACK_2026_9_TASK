@@ -5,7 +5,7 @@ import { AGENT_ABOUT, LIVE_MS, STATUS_LABEL } from '../model/agents'
 import type { AgentInstance } from '../model/agents'
 import { clock } from '../model/text'
 import { BotAvatar } from './BotAvatar'
-import { Empty, Findings, Line, Note, Requirements, Section, Stories, Tasks } from './Items'
+import { Architecture, Empty, Findings, Line, Note, Requirements, Section, Stories, Tasks } from './Items'
 
 type Tab = 'input' | 'stream' | 'result' | 'timeline'
 
@@ -100,6 +100,24 @@ function InputTab({ view, inst }: { view: RunView; inst: AgentInstance }) {
             <Requirements items={view.requirements} />
           </Section>
           <Section title="Решения по вопросам Аналитика">{decisions(view)}</Section>
+        </>
+      )
+    case 'architect':
+      return (
+        <>
+          <Section title="Истории" count={view.stories.length}>
+            <Stories items={view.stories} />
+          </Section>
+          <Section title="Решения по вопросам Аналитика">{decisions(view)}</Section>
+          <Section title="Операции контрактов" count={view.contractOps.length}>
+            <ul className="af-list">
+              {view.contractOps.slice(0, 40).map((op) => (
+                <Line key={op} id={op}>
+                  {view.sources.find((x) => x.id === op)?.title ?? ''}
+                </Line>
+              ))}
+            </ul>
+          </Section>
         </>
       )
     case 'tasks':
@@ -209,6 +227,12 @@ function ResultTab({ view, inst }: { view: RunView; inst: AgentInstance }) {
         <Section title="Пользовательские истории" count={view.stories.length}>
           <Stories items={view.stories} />
         </Section>
+      )
+    case 'architect':
+      return view.architecture ? (
+        <Architecture plan={view.architecture} problems={view.architectureProblems} />
+      ) : (
+        <Empty>{view.nodes.architect.summary || 'План ещё не построен.'}</Empty>
       )
     case 'tasks': {
       if (!story) return <Empty>История ещё не написана.</Empty>

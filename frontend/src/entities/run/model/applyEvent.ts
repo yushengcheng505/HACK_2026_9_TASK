@@ -1,5 +1,6 @@
 import type {
   AgentCall,
+  ArchitecturePlan,
   Coverage,
   Decomposition,
   Finding,
@@ -26,6 +27,7 @@ export const PIPELINE: readonly { node: PipelineNode; label: string; short: stri
   { node: 'analyst', label: 'Аналитик', short: 'Аналитик' },
   { node: 'ask_user', label: 'Вопросы', short: 'Вопросы' },
   { node: 'stories', label: 'Истории', short: 'US' },
+  { node: 'architect', label: 'Архитектор', short: 'Архитектор' },
   { node: 'tasks', label: 'Задачи', short: 'TASK' },
   { node: 'checks', label: 'ОТК', short: 'ОТК' },
   { node: 'critic', label: 'Критик', short: 'Критик' },
@@ -40,7 +42,7 @@ const STREAM_LIMIT = 40_000
 /** Узел графа, в котором работает экземпляр агента: по нему считаем круг. */
 export function phaseOfCall(node: string): PipelineNode {
   const base = node.split(':')[0]
-  if (base === 'requirements' || base === 'analyst' || base === 'stories' || base === 'tasks') return base
+  if (base === 'requirements' || base === 'analyst' || base === 'stories' || base === 'architect' || base === 'tasks') return base
   if (node === 'skeptic:gaps') return 'analyst'
   return 'critic'
 }
@@ -101,6 +103,9 @@ export function emptyRun(runId: string): RunView {
     finishedAt: null,
     error: null,
     language: null,
+    architectEnabled: false,
+    architecture: null,
+    architectureProblems: [],
     sources: [],
     contractOps: [],
     requirements: [],
@@ -160,6 +165,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         title: epic.title,
         model: (d.model as string) ?? '',
         concurrency: (d.concurrency as number | undefined) ?? null,
+        architectEnabled: d.architect === true,
         startedAt: view.startedAt ?? e.receivedAt,
         status: 'running',
         log: pushLog(view, line(e, `Запуск ${d.run_id as string} · модель ${(d.model as string) ?? '—'}`, 'brand')),
@@ -236,6 +242,19 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         concurrency: d.concurrency as number,
         log: pushLog(view, line(e, `Параллельных запросов к модели: ${d.concurrency as number}`)),
       }
+    case 'architecture_planned': {
+      const plan = d.plan as ArchitecturePlan
+      const problems = (d.problems as string[] | undefined) ?? []
+      return {
+        ...next,
+        architecture: plan,
+        architectureProblems: problems,
+        log: pushLog(
+          view,
+          line(e, `План интеграции: сервисов ${plan.services.length}, внешних вызовов ${plan.external_calls.length}, связей ${plan.links.length}`, 'brand'),
+        ),
+      }
+    }
     case 'questions_asked':
       return { ...next, questions: d.questions as Question[] }
     case 'waiting_answers':
@@ -443,5 +462,6 @@ export function withResult(view: RunView, result: Decomposition): RunView {
     coverage: result.coverage,
     stats: result.stats,
     findings: result.findings?.length ? result.findings : view.findings,
+    architecture: result.architecture ?? view.architecture,
   }
 }

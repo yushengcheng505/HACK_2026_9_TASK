@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import type { RunView } from '@/entities/run'
-import { isLegacyReview } from '../model/agents'
+import { hasArchitect, isLegacyReview } from '../model/agents'
 import type { AgentInstance, AgentStatus } from '../model/agents'
 import { metaFor } from '../model/meta'
-import { CHIP, FLOW_WIDTH, flowHeight, layoutFlow } from '../model/layout'
+import { CHIP, flowHeight, flowWidth, layoutFlow } from '../model/layout'
 import type { Edge, FlowLayout } from '../model/layout'
 import type { ParticleApi } from '../model/particles'
 import { usePanZoom } from '../model/usePanZoom'
@@ -51,13 +51,14 @@ function useSpawn(layout: FlowLayout | null, world: RefObject<HTMLDivElement | n
       const delay = Math.max(0, clock.current - now)
       clock.current = Math.max(clock.current, now) + SPAWN_GAP
 
+      const source = layout?.boxes.architect ? 'architect' : 'stories'
       const edgeId = role === 'tasks' ? `st-gen:${storyId}` : `gate-rev:${storyId}`
       const avatar = chip.querySelector('svg')
       const flight = avatar ? fx.carry(edgeId, avatar, delay) : null
       if (!flight) return
 
       chip.style.opacity = '0'
-      root.querySelector<HTMLElement>(`[data-node="${role === 'tasks' ? 'stories' : 'gate'}"]`)?.animate(
+      root.querySelector<HTMLElement>(`[data-node="${role === 'tasks' ? source : 'gate'}"]`)?.animate(
         [{ transform: 'scale(1)' }, { transform: 'scale(1.05, 0.95)', offset: 0.35 }, { transform: 'scale(1)' }],
         { duration: 320, delay, easing: EASE_OUT },
       )
@@ -103,8 +104,9 @@ export function FlowCanvas({ view, instances, selected, onSelect, particles, liv
   const { ref: viewport, w, h } = useSize()
   const worldRef = useRef<HTMLDivElement>(null)
   const storyIds = useMemo(() => view.stories.map((s) => s.id), [view.stories])
-  const world = useMemo(() => ({ w: FLOW_WIDTH, h: flowHeight(storyIds.length) }), [storyIds.length])
-  const layout = useMemo(() => (w && h ? layoutFlow(storyIds) : null), [w, h, storyIds])
+  const withArchitect = hasArchitect(view)
+  const world = useMemo(() => ({ w: flowWidth(withArchitect), h: flowHeight(storyIds.length) }), [storyIds.length, withArchitect])
+  const layout = useMemo(() => (w && h ? layoutFlow(storyIds, withArchitect) : null), [w, h, storyIds, withArchitect])
   const byKey = useMemo(() => new Map(instances.map((i) => [i.key, i])), [instances])
   const pz = usePanZoom(viewport, world, { w, h })
   const spawn = useSpawn(layout, worldRef, particles)
@@ -216,9 +218,9 @@ export function FlowCanvas({ view, instances, selected, onSelect, particles, liv
             </div>
           )}
 
-          {(['requirements', 'analyst', 'stories', 'junction', 'simplifier', 'skeptic'] as const).map((key) => {
+          {(['requirements', 'analyst', 'stories', 'architect', 'junction', 'simplifier', 'skeptic'] as const).map((key) => {
             const inst = byKey.get(key)
-            if (!inst) return null
+            if (!inst || !layout.boxes[key]) return null
             return <AgentCard key={key} inst={inst} box={layout.boxes[key]} meta={metaFor(inst, view)} selected={selected === key} onSelect={onSelect} onHover={onHover} />
           })}
 
