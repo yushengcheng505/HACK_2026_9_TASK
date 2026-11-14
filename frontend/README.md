@@ -12,6 +12,9 @@ npm run preview  # отдать собранный dist/
 
 Отладка анимации: `http://localhost:5173/?t=8.5` останавливает прогон на 8.5 секунде.
 
+Витрина маленьких роботов: `http://localhost:5173/agents/` — каждый из 8 агентов в трёх состояниях
+(ожидание, работа, успех), крупно и в натуральную величину. Отдельная точка входа, к бэкенду не обращается.
+
 ## Пульт декомпозиции — `/console/`
 
 Вторая страница (отдельная точка входа Vite) для работы с агентом из `../backend`. Лендинг `/` от неё не зависит
@@ -33,17 +36,18 @@ npm run dev                                               # http://localhost:517
 
 ```
 src/
-  app/                 точки сборки: App (лендинг), ConsoleApp (пульт); стили: index.css, console.css
+  app/                 точки сборки: App (лендинг), ConsoleApp (пульт), AgentsApp (витрина агентов); стили: index.css, console.css
   pages/home/          главная страница — только компоновка виджетов
   pages/console/       пульт: маршрутизация по хешу
+  pages/agents/        витрина маленьких роботов: 8 агентов × 3 состояния
   widgets/
     site-header/       шапка и навигация
     hero/              заголовок страницы
     agent-stage/       сцена: NAPS и 8 агентов в два ряда — декомпозиция и проверка
       model/           геометрия сцены: ряды и масштаб агентов, маршруты самолётиков, руки NAPS
       ui/              тулбар с этапами, консоль NAPS, строка задачи (не интерактивная)
-      ui/scene/        SVG-сцена: orchestrator/, agents/ (по файлу на робота), подписи рядов, маршруты, самолётики;
-                       анимации бездействия и работы — классы fx-* в scene.css
+      ui/scene/        SVG-сцена: orchestrator/, agents/ (слот с маленькой моделью AgentFigure и подписью),
+                       подписи рядов, маршруты, самолётики; анимации NAPS и маршрутов — классы fx-* в scene.css
     site-footer/
     console-shell/     пульт: боковая панель, статус модели и контура
     launch-panel/      галерея демо-эпиков и форма своего эпика
@@ -65,6 +69,7 @@ src/
     run-stream/        поток SSE прогона → модель (пачки событий раз в кадр)
     launch-run/ answer-questions/ edit-result/   запуск, ответы аналитику, правки результата
   entities/agent/      агенты: типы, список из 8 ролей в двух командах, AgentAvatar — маленькая версия каждого робота
+                       с состояниями waiting / working / done (анимации — классы av-* в avatar.css)
   entities/run/        прогон: типы событий и результата, редьюсер applyEvent, цепочки прослеживаемости
   shared/              палитра для SVG, математика кривых, Button, Caret, LogoMark (голова NAPS), BrandName (SYNAPS)
 ```
@@ -74,7 +79,8 @@ src/
 - Неверный статус, текст или момент события — `features/team-run/model/` (не зависит от React,
   можно вызвать `computeRunFrame(t)` для любого `t`).
 - Самолётик летит не туда, руки не попадают по клавишам — `widgets/agent-stage/model/`.
-- Не так нарисован конкретный агент — `widgets/agent-stage/ui/scene/agents/<Name>Bot.tsx`.
+- Не так нарисован или анимирован конкретный агент — `entities/agent/ui/AgentAvatar.tsx` и `avatar.css`
+  (те же модели и на сцене главной, и на витрине `/agents/`).
   В DOM у групп есть атрибуты `data-agent` и `data-layer`.
 - Цвета: токены Tailwind в `app/styles/index.css`, копия для SVG — `shared/config/palette.ts`.
 - Пульт показывает не то, что прислал бэкенд — `entities/run/model/applyEvent.ts` (чистая функция

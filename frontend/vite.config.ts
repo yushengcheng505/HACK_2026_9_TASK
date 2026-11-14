@@ -16,6 +16,7 @@ export default defineConfig({
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         console: fileURLToPath(new URL('./console/index.html', import.meta.url)),
+        agents: fileURLToPath(new URL('./agents/index.html', import.meta.url)),
       },
     },
   },

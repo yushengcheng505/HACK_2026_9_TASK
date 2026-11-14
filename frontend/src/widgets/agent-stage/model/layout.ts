@@ -4,9 +4,8 @@ import type { Point, QuadCurve } from '@/shared/lib/math'
 /** Координаты в системе viewBox сцены 1200×600. */
 export const SCENE_SIZE = { width: 1200, height: 600 } as const
 
-/** Роботы нарисованы в своих координатах (корпус 120×100, центр — (0, 200)) и уменьшены до AGENT_SCALE. */
-export const AGENT_SCALE = 0.68
-export const BOT_BODY_CENTER_Y = 200
+/** Маленькие модели роботов (рамка 48×40, голова 32×26) увеличены так, что голова на сцене — 80×65. */
+export const AGENT_FIGURE_SCALE = 2.5
 
 const COLUMNS = [560, 735, 910, 1085] as const
 
@@ -33,9 +32,6 @@ export const CAPTION = {
 export interface AgentSlot {
   cx: number
   bodyY: number
-  /** Сдвиг фазы покачивания, чтобы агенты двигались не синхронно. */
-  motionDelay: string
-  blinkDelay: string
 }
 
 const columnOf = (id: AgentId) => {
@@ -44,18 +40,7 @@ const columnOf = (id: AgentId) => {
 }
 
 export const AGENT_SLOTS = Object.fromEntries(
-  AGENTS.map((agent, index) => {
-    const column = columnOf(agent.id)
-    return [
-      agent.id,
-      {
-        cx: COLUMNS[column],
-        bodyY: TEAM_ROWS[agent.team].bodyY,
-        motionDelay: `${-((index * 0.73) % 4).toFixed(2)}s`,
-        blinkDelay: `${-((index * 1.37) % 5.2).toFixed(2)}s`,
-      },
-    ]
-  }),
+  AGENTS.map((agent) => [agent.id, { cx: COLUMNS[columnOf(agent.id)], bodyY: TEAM_ROWS[agent.team].bodyY }]),
 ) as Record<AgentId, AgentSlot>
 
 export interface FlightRoute {
