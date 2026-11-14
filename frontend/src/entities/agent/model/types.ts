@@ -1,16 +1,21 @@
-export type AgentId = 'scout' | 'lens' | 'coder' | 'editor'
+export type AgentId =
+  | 'requirements'
+  | 'analyst'
+  | 'stories'
+  | 'tasks'
+  | 'reviewer'
+  | 'junction'
+  | 'simplifier'
+  | 'skeptic'
 
-export interface AgentAvatarColors {
-  body: string
-  stroke: string
-  eye: string
-}
+/** decomposition — раскладывают эпик на задачи, review — проверяют результат. */
+export type AgentTeam = 'decomposition' | 'review'
 
 export interface Agent {
   id: AgentId
+  team: AgentTeam
+  /** Должность — подпись под роботом. */
   name: string
-  /** Винительный падеж для фраз вида «ждём Ищейку…». */
-  nameAccusative: string
-  role: string
-  avatar: AgentAvatarColors
+  /** Чем занят, коротко — вторая строка подписи. */
+  focus: string
 }

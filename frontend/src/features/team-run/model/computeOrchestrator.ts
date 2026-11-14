@@ -10,22 +10,25 @@ interface LogEntry {
   text: string
 }
 
+const { waveStart } = RUN_TIMELINE
+
 const LOG: readonly LogEntry[] = [
-  { at: 0.2, text: 'задача получена' },
-  { at: 1.1, text: `план: ${AGENTS.length} подзадачи` },
-  { at: 2.3, text: 'раздаю задачи агентам' },
+  { at: 0.2, text: 'эпик получен' },
+  { at: 1.1, text: 'план: 4 этапа и 4 проверки' },
+  { at: waveStart.decomposition + 0.1, text: 'раздаю декомпозицию' },
+  { at: waveStart.review + 0.1, text: 'отдаю на проверку' },
   ...AGENTS.map((agent, index) => ({
     at: agentTiming(index).deliveredAt,
     text: `${agent.name}: готово · ${index + 1}/${AGENTS.length}`,
   })),
-  { at: RUN_TIMELINE.assemblyStart, text: 'собираю финальный ответ' },
-  { at: RUN_TIMELINE.complete, text: 'результат готов' },
-]
+  { at: RUN_TIMELINE.assemblyStart, text: 'собираю итог' },
+  { at: RUN_TIMELINE.complete, text: 'задачи готовы' },
+].sort((a, b) => a.at - b.at)
 
 function statusWordFor(mood: OrchestratorMood, time: number) {
   if (mood === 'done') return 'готово'
   if (mood === 'typing') return 'печатает'
-  return time >= RUN_TIMELINE.dispatchStart ? 'ждёт агентов' : 'думает'
+  return time >= waveStart.decomposition ? 'ждёт агентов' : 'думает'
 }
 
 export function computeOrchestrator(time: number): OrchestratorState {

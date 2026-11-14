@@ -1,14 +1,22 @@
 import type { ComponentType } from 'react'
 import type { AgentId } from '@/entities/agent'
-import { CoderBot } from './CoderBot'
-import { EditorBot } from './EditorBot'
+import { AnalystBot } from './AnalystBot'
 import type { BotProps } from './expression'
-import { LensBot } from './LensBot'
-import { ScoutBot } from './ScoutBot'
+import { JunctionBot } from './JunctionBot'
+import { RequirementsBot } from './RequirementsBot'
+import { ReviewerBot } from './ReviewerBot'
+import { SimplifierBot } from './SimplifierBot'
+import { SkepticBot } from './SkepticBot'
+import { StoriesBot } from './StoriesBot'
+import { TasksBot } from './TasksBot'
 
 export const AGENT_BOTS: Record<AgentId, ComponentType<BotProps>> = {
-  scout: ScoutBot,
-  lens: LensBot,
-  coder: CoderBot,
-  editor: EditorBot,
+  requirements: RequirementsBot,
+  analyst: AnalystBot,
+  stories: StoriesBot,
+  tasks: TasksBot,
+  reviewer: ReviewerBot,
+  junction: JunctionBot,
+  simplifier: SimplifierBot,
+  skeptic: SkepticBot,
 }

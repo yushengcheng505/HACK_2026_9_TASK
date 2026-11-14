@@ -1,33 +1,20 @@
-import { palette } from '@/shared/config/palette'
-import type { Agent } from './types'
+import type { Agent, AgentTeam } from './types'
 
+/** Порядок важен: внутри команды агенты получают задачи слева направо. */
 export const AGENTS: readonly Agent[] = [
-  {
-    id: 'scout',
-    name: 'Ищейка',
-    nameAccusative: 'Ищейку',
-    role: 'исследователь',
-    avatar: { body: palette.brandDeep, stroke: palette.brandMid, eye: palette.brand },
-  },
-  {
-    id: 'lens',
-    name: 'Лупа',
-    nameAccusative: 'Лупу',
-    role: 'аналитик',
-    avatar: { body: palette.brand, stroke: palette.brand, eye: palette.ink },
-  },
-  {
-    id: 'coder',
-    name: 'Бит',
-    nameAccusative: 'Бита',
-    role: 'разработчик',
-    avatar: { body: palette.ink, stroke: palette.brand, eye: palette.brand },
-  },
-  {
-    id: 'editor',
-    name: 'Перо',
-    nameAccusative: 'Перо',
-    role: 'редактор',
-    avatar: { body: palette.mint, stroke: palette.mint, eye: palette.ink },
-  },
+  { id: 'requirements', team: 'decomposition', name: 'Составитель', focus: 'требования' },
+  { id: 'analyst', team: 'decomposition', name: 'Аналитик', focus: 'пробелы' },
+  { id: 'stories', team: 'decomposition', name: 'Автор историй', focus: 'истории' },
+  { id: 'tasks', team: 'decomposition', name: 'Генератор задач', focus: 'задачи' },
+  { id: 'reviewer', team: 'review', name: 'Рецензент', focus: 'ошибки' },
+  { id: 'junction', team: 'review', name: 'Редактор стыков', focus: 'дубли и дыры' },
+  { id: 'simplifier', team: 'review', name: 'Упрощатель', focus: 'лишняя работа' },
+  { id: 'skeptic', team: 'review', name: 'Скептик', focus: 'ложные находки' },
 ]
+
+export const TEAM_LABELS: Record<AgentTeam, string> = {
+  decomposition: 'Декомпозиция',
+  review: 'Проверка',
+}
+
+export const teamAgents = (team: AgentTeam) => AGENTS.filter((agent) => agent.team === team)

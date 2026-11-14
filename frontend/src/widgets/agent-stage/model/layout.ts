@@ -1,45 +1,97 @@
-import type { AgentId } from '@/entities/agent'
+import { AGENTS, type AgentId, type AgentTeam } from '@/entities/agent'
 import type { QuadCurve } from '@/shared/lib/math'
 
 /** Координаты в системе viewBox сцены 1200×600. */
 export const SCENE_SIZE = { width: 1200, height: 600 } as const
 
+/** Роботы нарисованы в своих координатах (корпус 120×100, центр — (0, 200)) и уменьшены до AGENT_SCALE. */
+export const AGENT_SCALE = 0.68
+export const BOT_BODY_CENTER_Y = 200
+
+const COLUMNS = [560, 735, 910, 1085] as const
+
+export interface TeamRow {
+  /** Центр корпусов роботов этой команды по Y. */
+  bodyY: number
+  /** Базовая линия подписи команды над роботами. */
+  labelY: number
+}
+
+export const TEAM_ROWS: Record<AgentTeam, TeamRow> = {
+  decomposition: { bodyY: 150, labelY: 44 },
+  review: { bodyY: 412, labelY: 304 },
+}
+
+/** Подписи под роботом — смещения от центра корпуса, в координатах сцены. */
+export const CAPTION = {
+  shadowY: 47,
+  nameY: 68,
+  focusY: 84,
+  chipY: 92,
+  chipHeight: 22,
+  chipWidth: 88,
+} as const
+
 export interface AgentSlot {
-  /** Центр агента по X; рисунок агента задан относительно этой точки. */
   cx: number
+  bodyY: number
   /** Сдвиг фазы покачивания, чтобы агенты двигались не синхронно. */
   motionDelay: string
   blinkDelay: string
 }
 
-export const AGENT_SLOTS: Record<AgentId, AgentSlot> = {
-  scout: { cx: 560, motionDelay: '-0.6s', blinkDelay: '-1.1s' },
-  lens: { cx: 735, motionDelay: '-1.7s', blinkDelay: '-2.4s' },
-  coder: { cx: 910, motionDelay: '-2.3s', blinkDelay: '-3.3s' },
-  editor: { cx: 1085, motionDelay: '-3.1s', blinkDelay: '-4s' },
+const columnOf = (id: AgentId) => {
+  const agent = AGENTS.find((a) => a.id === id)!
+  return AGENTS.filter((a) => a.team === agent.team).indexOf(agent)
 }
+
+export const AGENT_SLOTS = Object.fromEntries(
+  AGENTS.map((agent, index) => {
+    const column = columnOf(agent.id)
+    return [
+      agent.id,
+      {
+        cx: COLUMNS[column],
+        bodyY: TEAM_ROWS[agent.team].bodyY,
+        motionDelay: `${-((index * 0.73) % 4).toFixed(2)}s`,
+        blinkDelay: `${-((index * 1.37) % 5.2).toFixed(2)}s`,
+      },
+    ]
+  }),
+) as Record<AgentId, AgentSlot>
 
 export interface FlightRoute {
   out: QuadCurve
   back: QuadCurve
 }
 
-/** Вложенные непересекающиеся маршруты: у каждого самолётика своя дорожка. */
-export const FLIGHT_ROUTES: Record<AgentId, FlightRoute> = {
-  scout: {
-    out: { from: [292, 174], control: [430, 70], to: [560, 136] },
-    back: { from: [560, 358], control: [455, 340], to: [292, 194] },
-  },
-  lens: {
-    out: { from: [290, 146], control: [505, 26], to: [735, 136] },
-    back: { from: [735, 358], control: [560, 490], to: [296, 226] },
-  },
-  coder: {
-    out: { from: [278, 126], control: [590, -16], to: [910, 136] },
-    back: { from: [910, 358], control: [660, 565], to: [318, 264] },
-  },
-  editor: {
-    out: { from: [250, 118], control: [670, -56], to: [1085, 134] },
-    back: { from: [1085, 358], control: [770, 650], to: [326, 298] },
-  },
+/** Верх антенны робота над центром корпуса и низ его чипа статуса. */
+const AGENT_TOP = 70
+const AGENT_BOTTOM = CAPTION.chipY + CAPTION.chipHeight + 6
+
+/**
+ * Маршруты вложены, чтобы у каждого самолётика была своя дорожка:
+ * декомпозиция получает задачи сверху, отдаёт в промежуток между рядами;
+ * проверка получает через промежуток, отдаёт снизу — прямо в консоль NAPS.
+ */
+function routeFor(id: AgentId): FlightRoute {
+  const { cx, bodyY } = AGENT_SLOTS[id]
+  const column = columnOf(id)
+  const team = AGENTS.find((a) => a.id === id)!.team
+
+  if (team === 'decomposition') {
+    return {
+      out: { from: [292, 150], control: [(292 + cx) / 2, 30 - column * 26], to: [cx, bodyY - AGENT_TOP] },
+      back: { from: [cx, bodyY + AGENT_BOTTOM], control: [(cx + 300) / 2, 300 + column * 9], to: [300, 236] },
+    }
+  }
+  return {
+    out: { from: [300, 200], control: [(300 + cx) / 2, 250 + column * 8], to: [cx, bodyY - AGENT_TOP] },
+    back: { from: [cx, bodyY + AGENT_BOTTOM], control: [(cx + 360) / 2, 600 + column * 6], to: [358, 468] },
+  }
 }
+
+export const FLIGHT_ROUTES = Object.fromEntries(AGENTS.map((agent) => [agent.id, routeFor(agent.id)])) as Record<
+  AgentId,
+  FlightRoute
+>

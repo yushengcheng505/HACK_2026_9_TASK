@@ -1,3 +1,3 @@
-export { AGENTS } from './model/agents'
-export type { Agent, AgentAvatarColors, AgentId } from './model/types'
+export { AGENTS, TEAM_LABELS, teamAgents } from './model/agents'
+export type { Agent, AgentId, AgentTeam } from './model/types'
 export { AgentAvatar } from './ui/AgentAvatar'

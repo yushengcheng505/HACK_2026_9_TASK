@@ -6,6 +6,7 @@ import { AgentSlot } from './agents/AgentSlot'
 import { Orchestrator } from './orchestrator/Orchestrator'
 import { PaperPlanes } from './PaperPlanes'
 import { RouteTrails } from './RouteTrails'
+import { TeamLabels } from './TeamLabels'
 import './scene.css'
 
 interface StageSceneProps {
@@ -22,8 +23,9 @@ export function StageScene({ frame }: StageSceneProps) {
           viewBox={`0 0 ${SCENE_SIZE.width} ${SCENE_SIZE.height}`}
           className="absolute inset-0 block size-full"
           role="img"
-          aria-label="Оркестратор NAPS отправляет бумажные самолётики с задачами четырём агентам и получает результаты обратно"
+          aria-label="Оркестратор NAPS отправляет задачи четырём агентам декомпозиции, затем четырём проверяющим и собирает их ответы"
         >
+          <TeamLabels />
           <RouteTrails trails={trails} />
           <Orchestrator state={frame.orchestrator} time={frame.time} />
           {frame.agents.map((state) => (

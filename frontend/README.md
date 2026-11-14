@@ -39,10 +39,11 @@ src/
   widgets/
     site-header/       шапка и навигация
     hero/              заголовок страницы
-    agent-stage/       сцена с агентами
-      model/           геометрия сцены: позиции агентов, маршруты самолётиков, руки NAPS
+    agent-stage/       сцена: NAPS и 8 агентов в два ряда — декомпозиция и проверка
+      model/           геометрия сцены: ряды и масштаб агентов, маршруты самолётиков, руки NAPS
       ui/              тулбар с этапами, консоль NAPS, строка задачи (не интерактивная)
-      ui/scene/        SVG-сцена: orchestrator/, agents/ (по файлу на робота), маршруты, самолётики
+      ui/scene/        SVG-сцена: orchestrator/, agents/ (по файлу на робота), подписи рядов, маршруты, самолётики;
+                       анимации бездействия и работы — классы fx-* в scene.css
     site-footer/
     console-shell/     пульт: боковая панель, статус модели и контура
     launch-panel/      галерея демо-эпиков и форма своего эпика
@@ -56,16 +57,16 @@ src/
     results-table/ qc-report/ gaps-board/     вкладки: правка, ОТК, пробелы
   features/
     team-run/          логика прогона без отрисовки
-      model/timeline.ts        все тайминги
-      model/scenario.ts        демо-тексты (заменятся данными с бэкенда)
+      model/timeline.ts        все тайминги: две волны — сначала декомпозиция, потом проверка
+      model/scenario.ts        демо-задача и названия этапов
       model/computeRunFrame.ts чистая функция time → состояние страницы
       model/useTeamRun.ts      хук: часы + кадр
     export-result/     кнопки «Скопировать» и «Скачать .md»
     run-stream/        поток SSE прогона → модель (пачки событий раз в кадр)
     launch-run/ answer-questions/ edit-result/   запуск, ответы аналитику, правки результата
-  entities/agent/      агенты: типы, список, аватар
+  entities/agent/      агенты: типы, список из 8 ролей в двух командах, AgentAvatar — маленькая версия каждого робота
   entities/run/        прогон: типы событий и результата, редьюсер applyEvent, цепочки прослеживаемости
-  shared/              палитра для SVG, математика кривых, печать текста, Button, Caret, LogoMark (голова NAPS), BrandName (SYNAPS)
+  shared/              палитра для SVG, математика кривых, Button, Caret, LogoMark (голова NAPS), BrandName (SYNAPS)
 ```
 
 ## Где искать ошибку

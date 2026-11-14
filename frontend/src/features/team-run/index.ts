@@ -1,6 +1,5 @@
 export { computeRunFrame } from './model/computeRunFrame'
-export { DEMO_DELIVERABLES, DEMO_SUMMARY, PHASE_LABELS } from './model/scenario'
-export type { AgentDeliverable } from './model/scenario'
+export { PHASE_LABELS } from './model/scenario'
 export { RUN_TIMELINE } from './model/timeline'
 export type {
   AgentRunState,
@@ -8,7 +7,6 @@ export type {
   LogLine,
   OrchestratorMood,
   OrchestratorState,
-  ResultStatus,
   RunFrame,
   RunPhase,
 } from './model/types'

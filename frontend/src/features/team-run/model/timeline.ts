@@ -1,24 +1,22 @@
-import { AGENTS } from '@/entities/agent'
+import { AGENTS, type AgentTeam } from '@/entities/agent'
 
 /** Все значения — секунды от начала прогона. */
 export const RUN_TIMELINE = {
-  loopDuration: 20,
-  dispatchStart: 2.4,
-  dispatchStagger: 0.35,
-  flightOut: 1.3,
-  firstAgentDone: 6.5,
-  doneStagger: 1.1,
-  flightBack: 1.5,
-  assemblyStart: 11.7,
-  complete: 13.5,
+  loopDuration: 24,
+  /** Когда NAPS начинает раздавать задачи каждой команде: сначала декомпозиция, потом проверка. */
+  waveStart: { decomposition: 2.2, review: 10.2 } satisfies Record<AgentTeam, number>,
+  dispatchStagger: 0.3,
+  flightOut: 1.2,
+  /** От начала волны до момента, когда первый агент команды закончил. */
+  firstDone: 3.4,
+  doneStagger: 0.75,
+  flightBack: 1.3,
+  assemblyStart: 17.4,
+  complete: 19,
 } as const
 
-/** Скорость «печати» текста, символов в секунду. */
-export const TYPING_SPEED = {
-  log: 32,
-  result: 110,
-  summary: 70,
-} as const
+/** Скорость «печати» строк в консоли NAPS, символов в секунду. */
+export const TYPING_SPEED = { log: 32 } as const
 
 export interface AgentTiming {
   dispatchedAt: number
@@ -29,8 +27,11 @@ export interface AgentTiming {
 
 export function agentTiming(index: number): AgentTiming {
   const t = RUN_TIMELINE
-  const dispatchedAt = t.dispatchStart + t.dispatchStagger * index
-  const doneAt = t.firstAgentDone + t.doneStagger * index
+  const agent = AGENTS[index]
+  const order = AGENTS.slice(0, index).filter((other) => other.team === agent.team).length
+  const waveStart = t.waveStart[agent.team]
+  const dispatchedAt = waveStart + t.dispatchStagger * order
+  const doneAt = waveStart + t.firstDone + t.doneStagger * order
   return {
     dispatchedAt,
     arrivedAt: dispatchedAt + t.flightOut,
@@ -39,12 +40,12 @@ export function agentTiming(index: number): AgentTiming {
   }
 }
 
-const lastAgentTiming = agentTiming(AGENTS.length - 1)
+const lastDelivered = Math.max(...AGENTS.map((_, index) => agentTiming(index).deliveredAt))
 
-/** Моменты смены этапов «Анализ → Распределение → Выполнение → Сборка → готово». */
+/** Моменты смены этапов «Анализ → Декомпозиция → Проверка → Сборка → готово». */
 export const PHASE_STARTS = [
-  RUN_TIMELINE.dispatchStart,
-  lastAgentTiming.arrivedAt,
-  lastAgentTiming.deliveredAt,
+  RUN_TIMELINE.waveStart.decomposition,
+  RUN_TIMELINE.waveStart.review,
+  lastDelivered,
   RUN_TIMELINE.complete,
 ] as const

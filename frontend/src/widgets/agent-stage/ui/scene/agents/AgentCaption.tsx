@@ -1,5 +1,6 @@
 import type { AgentRunState, AgentStatus } from '@/features/team-run'
 import { palette } from '@/shared/config/palette'
+import { CAPTION } from '../../../model/layout'
 
 interface ChipLook {
   fill: string
@@ -19,33 +20,32 @@ function chipText({ status, receiving }: AgentRunState) {
   return receiving ? 'получает…' : 'ждёт'
 }
 
-const CHIP = { width: 100, height: 26, y: 322 } as const
-
 interface AgentCaptionProps {
   state: AgentRunState
 }
 
+/** Подпись в координатах слота: (0, 0) — центр корпуса робота. */
 export function AgentCaption({ state }: AgentCaptionProps) {
   const look = CHIP_LOOK[state.status]
   return (
     <>
-      <text x="0" y="292" className="scene-label">
+      <text x="0" y={CAPTION.nameY} className="scene-label scene-label--agent">
         {state.agent.name}
       </text>
-      <text x="0" y="311" className="scene-role">
-        {state.agent.role}
+      <text x="0" y={CAPTION.focusY} className="scene-role">
+        {state.agent.focus}
       </text>
       <rect
-        x={-CHIP.width / 2}
-        y={CHIP.y}
-        width={CHIP.width}
-        height={CHIP.height}
-        rx={CHIP.height / 2}
+        x={-CAPTION.chipWidth / 2}
+        y={CAPTION.chipY}
+        width={CAPTION.chipWidth}
+        height={CAPTION.chipHeight}
+        rx={CAPTION.chipHeight / 2}
         fill={look.fill}
         stroke={look.stroke}
         className="pen-15"
       />
-      <text x="0" y="339" className="scene-chip" fill={look.ink}>
+      <text x="0" y={CAPTION.chipY + 15} className="scene-chip" fill={look.ink}>
         {chipText(state)}
       </text>
     </>
