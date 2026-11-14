@@ -12,7 +12,7 @@ export function StageToolbar({ phase }: StageToolbarProps) {
       <div className="flex items-center gap-2.5 font-mono text-[13px] text-fg-muted">
         <span className="fx-live inline-block size-[9px] rounded-full bg-brand" aria-hidden="true" />
         <span className="font-bold text-brand">В ЭФИРЕ</span>
-        <span>· Ядро и {AGENTS.length} агента</span>
+        <span>· NAPS и {AGENTS.length} агента</span>
       </div>
       <PhaseSteps phase={phase} />
     </div>

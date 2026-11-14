@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BrandName } from '@/shared/ui/BrandName'
 import { LogoMark } from '@/shared/ui/LogoMark'
 import { isClosedContour, useHealth } from '@/shared/lib/useHealth'
 import type { ConsoleRoute } from '@/shared/lib/useHashRoute'
@@ -22,7 +23,7 @@ export function ConsoleShell({ route, children }: ConsoleShellProps) {
         <a href="/" className="flex items-center gap-3 border-b border-line px-4 py-4" title="На лендинг">
           <LogoMark />
           <span className="flex flex-col">
-            <span className="font-display text-[15px] font-semibold tracking-tight text-fg">Стая</span>
+            <BrandName className="text-[15px]" />
             <span className="tag text-fg-dim">Пульт декомпозиции</span>
           </span>
         </a>

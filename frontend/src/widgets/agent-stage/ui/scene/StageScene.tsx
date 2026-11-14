@@ -22,7 +22,7 @@ export function StageScene({ frame }: StageSceneProps) {
           viewBox={`0 0 ${SCENE_SIZE.width} ${SCENE_SIZE.height}`}
           className="absolute inset-0 block size-full"
           role="img"
-          aria-label="Оркестратор Ядро отправляет бумажные самолётики с задачами четырём агентам и получает результаты обратно"
+          aria-label="Оркестратор NAPS отправляет бумажные самолётики с задачами четырём агентам и получает результаты обратно"
         >
           <RouteTrails trails={trails} />
           <Orchestrator state={frame.orchestrator} time={frame.time} />

@@ -1,16 +1,14 @@
 import type { RunFrame } from '@/features/team-run'
 import { StageScene } from './scene/StageScene'
 import { StageToolbar } from './StageToolbar'
-import { TaskForm } from './TaskForm'
+import { TaskPreview } from './TaskPreview'
 
 interface AgentStageProps {
   frame: RunFrame
   task: string
-  onTaskChange: (task: string) => void
-  onRun: () => void
 }
 
-export function AgentStage({ frame, task, onTaskChange, onRun }: AgentStageProps) {
+export function AgentStage({ frame, task }: AgentStageProps) {
   return (
     <section
       id="stage"
@@ -19,7 +17,7 @@ export function AgentStage({ frame, task, onTaskChange, onRun }: AgentStageProps
     >
       <StageToolbar phase={frame.phase} />
       <StageScene frame={frame} />
-      <TaskForm task={task} onTaskChange={onTaskChange} onRun={onRun} />
+      <TaskPreview task={task} />
     </section>
   )
 }

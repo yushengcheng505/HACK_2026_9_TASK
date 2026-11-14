@@ -12,7 +12,7 @@ export interface AgentRunState {
   status: AgentStatus
   /** Самолётик с задачей уже летит к агенту. */
   receiving: boolean
-  /** Ответ агента долетел до Ядра и показан в результатах. */
+  /** Ответ агента долетел до NAPS и показан в результатах. */
   delivered: boolean
   deliverable: AgentDeliverable
   revealed: TypedText

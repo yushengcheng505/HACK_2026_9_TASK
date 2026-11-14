@@ -6,13 +6,13 @@ interface OrchestratorConsoleProps {
   state: OrchestratorState
 }
 
-/** Панель статуса Ядра поверх сцены. Размеры в cqw — масштабируется вместе со сценой. */
+/** Панель статуса NAPS поверх сцены. Размеры в cqw — масштабируется вместе со сценой. */
 export function OrchestratorConsole({ state }: OrchestratorConsoleProps) {
   return (
     <div className="absolute top-[59%] bottom-[4%] left-[5%] z-[1] flex w-[24.5%] flex-col gap-[0.7cqw] rounded-[1.3cqw] border border-line-strong bg-panel px-[1.25cqw] py-[1.1cqw] font-mono text-[0.98cqw]">
       <div className="flex items-center justify-between gap-[0.6cqw]">
         <span className="flex items-center gap-[0.5cqw] font-bold text-fg">
-          <span>ЯДРО</span>
+          <span>NAPS</span>
           <span className="font-medium text-brand">{state.statusWord}</span>
           {state.typing && <TypingDots />}
         </span>

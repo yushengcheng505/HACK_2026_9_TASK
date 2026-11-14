@@ -6,7 +6,7 @@ interface OrchestratorBotProps {
   mood: OrchestratorMood
 }
 
-/** Корпус Ядра в абсолютных координатах сцены (центр — x = 200). */
+/** Корпус NAPS в абсолютных координатах сцены (центр — x = 200). */
 export function OrchestratorBot({ mood }: OrchestratorBotProps) {
   return (
     <g className={mood === 'typing' ? undefined : 'fx-float'}>

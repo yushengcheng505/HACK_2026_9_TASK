@@ -7,9 +7,8 @@ import { useRunClock } from './useRunClock'
 
 export function useTeamRun() {
   const [frozenAt] = useState(readFrozenTime)
-  const { time, restart } = useRunClock(RUN_TIMELINE.loopDuration, frozenAt)
-  const [task, setTask] = useState(DEMO_TASK)
+  const { time } = useRunClock(RUN_TIMELINE.loopDuration, frozenAt)
   const frame = useMemo(() => computeRunFrame(time), [time])
 
-  return { frame, task, setTask, restart }
+  return { frame, task: DEMO_TASK }
 }
