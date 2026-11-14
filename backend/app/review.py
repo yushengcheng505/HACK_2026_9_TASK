@@ -15,6 +15,7 @@ from app.calls import (
     ask,
     decisions_block,
     emit,
+    get_limiter,
     language_line,
     requirements_block,
     requirements_of,
@@ -37,6 +38,7 @@ from app.findings import (
     story_of,
     triage,
 )
+from app.limiter import Limiter
 from app.llm import LLMError
 from app.schemas import (
     CriticOut,
@@ -191,7 +193,7 @@ def _previous_for(findings: list[Finding], ctx: ReviewContext, story_id: str) ->
             and f.resolution_note != REMOVED_NOTE and story_of(f, index) == story_id]
 
 
-async def _guarded(semaphore: asyncio.Semaphore, role: str, story: Story | None, call):
+async def _guarded(semaphore: Limiter, role: str, story: Story | None, call):
     try:
         async with semaphore:
             return role, story, await call(), None
@@ -231,7 +233,7 @@ async def review_round(state: dict, config: RunnableConfig, round_: int) -> dict
     redone = set(state.get("redone", []))
     targets = ctx.stories if round_ == 1 else [s for s in ctx.stories if s.id in redone]
     mode = MODE_FULL if round_ == 1 else MODE_DELTA
-    semaphore = asyncio.Semaphore(get_settings().llm_concurrency)
+    semaphore = get_limiter(config)
     skipped: list[ReviewSkip] = []
 
     jobs = []
@@ -327,7 +329,7 @@ async def resolution_check(state: dict, config: RunnableConfig) -> dict:
     label = "Проверка решённости"
     emit("node_started", node="critic", label=label)
     hints = issues_by_story(ctx.stories, ctx.requirements, _issues(state), NOT_FIXABLE_BY_TASKS)
-    semaphore = asyncio.Semaphore(get_settings().llm_concurrency)
+    semaphore = get_limiter(config)
     jobs = [_guarded(semaphore, "reviewer", s,
                      lambda u=reviewer_user(state, ctx, s, MODE_RESOLUTION, prev, hints.get(s.id, [])), st=s:
                      ask(config, f"review:{st.id}", "reviewer", u, ReviewerOut))

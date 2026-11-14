@@ -1,22 +1,30 @@
 import asyncio
 import json
+import time
 import uuid
 from contextlib import asynccontextmanager
+from dataclasses import replace
+from typing import Literal
 from urllib.parse import quote, urlparse
 
 import aiosqlite
+import httpx
 from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.checks import compute_stats, run_checks
-from app.config import get_settings
+from app.config import BACKEND_DIR, REPO_DIR, get_settings
 from app.demos import list_demos, load_demo
 from app.exporters import to_docx, to_json, to_xlsx
 from app.graph import build_graph, encode_files
+from app.limiter import MAX_CONCURRENCY, MIN_CONCURRENCY
 from app.llm import LLM, OpenAICompatLLM
+from app.prompts import default_prompt, load_prompt, prompt_names, reset_override, save_override
+from app.providers import ENV_ID, builtin, list_models, provider_settings, public
+from app.providers import api_key as provider_key
 from app.runner import Runner
 from app.schemas import Decomposition, Source
 from app.sources import InputFile
@@ -27,16 +35,45 @@ EXPORTS = {
     "xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", to_xlsx),
     "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", to_docx),
 }
+BENCH_RESULTS = BACKEND_DIR / "bench" / "results"
+BENCH_SUMMARY = REPO_DIR / "docs" / "review-benchmark.md"
 REPLAY_MAX_PAUSE = 2.0
 SSE_PING = 15.0
 
 
 class DemoRunRequest(BaseModel):
     skip_questions: bool = False
+    provider_id: str | None = None
+    model: str | None = None
+    concurrency: int | None = Field(None, ge=MIN_CONCURRENCY, le=MAX_CONCURRENCY)
+
+
+class ConcurrencyIn(BaseModel):
+    value: int = Field(ge=MIN_CONCURRENCY, le=MAX_CONCURRENCY)
+
+
+class ProviderIn(BaseModel):
+    name: str
+    base_url: str
+    # None — оставить сохранённый ключ, пустая строка — убрать.
+    api_key: str | None = None
+    api_key_env: str | None = None
+    json_mode: Literal["json_schema", "json_object", "off"] = "json_schema"
+    default_model: str | None = None
 
 
 class AnswersRequest(BaseModel):
     answers: dict[str, str] = {}
+
+
+class PromptUpdate(BaseModel):
+    text: str
+
+
+def prompt_info(name: str) -> dict:
+    current, default = load_prompt(name), default_prompt(name)
+    return {"name": name, "text": current.text, "version": current.version, "default_text": default.text,
+            "default_version": default.version, "overridden": current.version != default.version}
 
 
 def create_app(llm: LLM | None = None) -> FastAPI:
@@ -50,7 +87,7 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         async with aiosqlite.connect(settings.data_dir / "checkpoints.db") as conn:
             graph = build_graph(AsyncSqliteSaver(conn))
             app.state.store = store
-            app.state.runner = Runner(store, graph, llm or OpenAICompatLLM(settings))
+            app.state.runner = Runner(store, graph, llm or OpenAICompatLLM(settings), settings.llm_concurrency)
             yield
             for task in list(app.state.runner.tasks.values()):
                 task.cancel()
@@ -71,18 +108,43 @@ def create_app(llm: LLM | None = None) -> FastAPI:
             raise HTTPException(404, "Запуск не найден")
         return run
 
-    def start(title: str, text: str, files: list[InputFile], skip: bool, origin: str, demo_id: str | None) -> dict:
+    def llm_for(provider_id: str | None, model: str | None) -> LLM:
+        """Модель прогона. Без провайдера и с серверной моделью — общий клиент сервера."""
+        model = (model or "").strip()
+        if not provider_id or provider_id == ENV_ID:
+            if not model or model == runner().llm.model:
+                return runner().llm
+            return OpenAICompatLLM(replace(settings, llm_model=model))
+        provider = store().get_provider(provider_id)
+        if provider is None:
+            raise HTTPException(422, "Нет такого провайдера")
+        if not (model := model or provider.get("default_model") or ""):
+            raise HTTPException(422, "Выберите модель")
+        return OpenAICompatLLM(provider_settings(settings, provider, model))
+
+    def run_llm(run: dict) -> LLM:
+        """Модель, с которой прогон запускали, — для продолжения после паузы или ответов."""
+        try:
+            return llm_for(run.get("provider_id"), run.get("model"))
+        except HTTPException:  # провайдер удалили — продолжаем серверной моделью
+            return runner().llm
+
+    def start(title: str, text: str, files: list[InputFile], skip: bool, origin: str, demo_id: str | None,
+              provider_id: str | None = None, model: str | None = None, concurrency: int | None = None) -> dict:
         if not text.strip():
             raise HTTPException(422, "Текст эпика пуст")
+        llm = llm_for(provider_id, model)
         run_id = uuid.uuid4().hex[:12]
-        store().create_run(run_id, title, origin, demo_id, skip)
+        store().create_run(run_id, title, origin, demo_id, skip, provider_id if provider_id != ENV_ID else None,
+                           concurrency)
         runner().start(run_id, {"title": title, "epic_text": text, "files": encode_files(files),
-                                "skip_questions": skip})
+                                "skip_questions": skip}, llm)
         return {"run_id": run_id}
 
     @app.get("/api/health")
     def health():
         return {"status": "ok", "model": runner().llm.model, "llm_host": urlparse(settings.llm_base_url).netloc,
+                "concurrency": settings.llm_concurrency,
                 "json_mode": settings.llm_json_mode}
 
     @app.get("/api/demos")
@@ -96,13 +158,17 @@ def create_app(llm: LLM | None = None) -> FastAPI:
             demo = load_demo(demo_id)
         except FileNotFoundError:
             raise HTTPException(404, "Демо не найдено")
-        return start(demo.title, demo.epic_text, demo.files, body.skip_questions, "demo", demo_id)
+        return start(demo.title, demo.epic_text, demo.files, body.skip_questions, "demo", demo_id,
+                     body.provider_id, body.model, body.concurrency)
 
     @app.post("/api/runs")
     async def create_run(
         title: str = Form(...),
         text: str = Form(...),
         skip_questions: bool = Form(False),
+        provider_id: str | None = Form(None),
+        model: str | None = Form(None),
+        concurrency: int | None = Form(None, ge=MIN_CONCURRENCY, le=MAX_CONCURRENCY),
         product_docs: list[UploadFile] = File(default=[]),
         external_docs: list[UploadFile] = File(default=[]),
         contracts: list[UploadFile] = File(default=[]),
@@ -115,7 +181,7 @@ def create_app(llm: LLM | None = None) -> FastAPI:
                 if (u.filename or "").lower().endswith(".pdf"):
                     raise HTTPException(422, f"PDF не поддерживается: {u.filename}")
                 files.append(InputFile(name=u.filename or "file", role=role, content=await u.read()))
-        return start(title, text, files, skip_questions, "ui", None)
+        return start(title, text, files, skip_questions, "ui", None, provider_id, model, concurrency)
 
     @app.get("/api/runs")
     def runs():
@@ -134,8 +200,28 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         known = {q["id"] for q in run.get("questions") or []}
         if unknown := sorted(set(body.answers) - known):
             raise HTTPException(422, f"Нет таких вопросов: {', '.join(unknown)}")
-        runner().resume(run_id, body.answers)
+        runner().resume(run_id, body.answers, run_llm(run))
         return {"status": "running"}
+
+    @app.post("/api/runs/{run_id}/pause")
+    async def pause(run_id: str):
+        if get_run_or_404(run_id)["status"] != "running" or not runner().pause(run_id):
+            raise HTTPException(409, "Запуск сейчас не выполняется")
+        return {"status": "pausing"}
+
+    @app.post("/api/runs/{run_id}/resume")
+    async def resume(run_id: str):
+        run = get_run_or_404(run_id)
+        if run["status"] != "paused":
+            raise HTTPException(409, "Запуск не на паузе")
+        runner().unpause(run_id, run_llm(run))
+        return {"status": "running"}
+
+    @app.put("/api/runs/{run_id}/concurrency")
+    async def set_concurrency(run_id: str, body: ConcurrencyIn):
+        """Сколько запросов к модели прогон шлёт одновременно — можно менять и до, и во время прогона."""
+        get_run_or_404(run_id)
+        return {"concurrency": await runner().set_concurrency(run_id, body.value)}
 
     @app.put("/api/runs/{run_id}/result")
     async def edit_result(run_id: str, result: Decomposition):
@@ -152,6 +238,88 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         runner().publish(run_id, "result_edited", {"stats": data["stats"], "coverage": data["coverage"],
                                                    "issues": data["issues"]})
         return data
+
+    # ---------- провайдеры моделей ----------
+
+    def provider_or_404(provider_id: str) -> dict:
+        provider = store().get_provider(provider_id)
+        if provider is None:
+            raise HTTPException(404, "Нет такого провайдера")
+        return provider
+
+    def save_provider(provider_id: str, body: ProviderIn, created_at: float, old_key: str | None) -> dict:
+        if not body.name.strip() or not body.base_url.startswith(("http://", "https://")):
+            raise HTTPException(422, "Нужны название и адрес вида https://…/v1")
+        provider = body.model_dump() | {"id": provider_id, "created_at": created_at,
+                                        "api_key": old_key if body.api_key is None else (body.api_key or None),
+                                        "base_url": body.base_url.strip().rstrip("/")}
+        store().save_provider(provider)
+        return public(provider)
+
+    @app.get("/api/providers")
+    def providers():
+        return [builtin(settings, runner().llm.model)] + [public(p) for p in store().list_providers()]
+
+    @app.post("/api/providers")
+    def create_provider(body: ProviderIn):
+        return save_provider(uuid.uuid4().hex[:8], body, time.time(), None)
+
+    @app.put("/api/providers/{provider_id}")
+    def update_provider(provider_id: str, body: ProviderIn):
+        old = provider_or_404(provider_id)
+        return save_provider(provider_id, body, old["created_at"], old.get("api_key"))
+
+    @app.delete("/api/providers/{provider_id}")
+    def delete_provider(provider_id: str):
+        provider_or_404(provider_id)
+        store().delete_provider(provider_id)
+        return {"status": "deleted"}
+
+    @app.get("/api/providers/{provider_id}/models")
+    async def provider_models(provider_id: str):
+        if provider_id == ENV_ID:
+            base_url, key = settings.llm_base_url, settings.llm_api_key
+        else:
+            provider = provider_or_404(provider_id)
+            base_url, key = provider["base_url"], provider_key(provider)
+        try:
+            return await list_models(base_url, key)
+        except (httpx.HTTPError, ValueError) as e:
+            reason = (str(e).splitlines() or [type(e).__name__])[0]
+            raise HTTPException(502, f"Провайдер не отдал список моделей: {reason}") from e
+
+    def known_prompt(name: str) -> str:
+        if name not in prompt_names():
+            raise HTTPException(404, "Нет такого промпта")
+        return name
+
+    @app.get("/api/prompts")
+    def prompts():
+        return [prompt_info(name) for name in prompt_names()]
+
+    @app.put("/api/prompts/{name}")
+    def update_prompt(name: str, body: PromptUpdate):
+        if not body.text.strip():
+            raise HTTPException(422, "Промпт пуст")
+        save_override(known_prompt(name), body.text)
+        return prompt_info(name)
+
+    @app.delete("/api/prompts/{name}")
+    def reset_prompt(name: str):
+        reset_override(known_prompt(name))
+        return prompt_info(name)
+
+    @app.get("/api/bench")
+    def bench():
+        """Отчёты мини-бенчмарка проверяющих: сводка для презентации и отчёт каждой серии замеров."""
+        def doc(path):
+            text = path.read_text(encoding="utf-8")
+            title = next((line.lstrip("# ").strip() for line in text.splitlines() if line.startswith("# ")), path.stem)
+            return {"title": title, "markdown": text}
+
+        series = [{"id": d.name, **doc(d / "report.md"), "runs": len(list(d.glob("*.json")))}
+                  for d in sorted(BENCH_RESULTS.glob("*/"), reverse=True) if (d / "report.md").is_file()]
+        return {"summary": doc(BENCH_SUMMARY) if BENCH_SUMMARY.is_file() else None, "series": series}
 
     @app.get("/api/runs/{run_id}/export/{fmt}")
     def export(run_id: str, fmt: str):

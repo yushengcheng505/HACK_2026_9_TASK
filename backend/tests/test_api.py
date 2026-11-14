@@ -1,5 +1,7 @@
+import asyncio
 import io
 import json
+import threading
 import time
 
 import pytest
@@ -109,6 +111,125 @@ def test_upload_run_and_edit_result(client):
     assert "REQ-001" in edited["coverage"]["uncovered_requirements"]
     assert edited["stats"]["tasks_count"] == 2
     assert client.get(f"/api/runs/{run_id}").json()["result"]["stats"]["tasks_count"] == 2
+
+
+class GatedLLM(FakeLLM):
+    """Шаг «Истории» ждёт, пока тест его не отпустит, — так прогон гарантированно идёт в момент паузы."""
+
+    def __init__(self):
+        super().__init__()
+        self.release = threading.Event()
+
+    async def complete_json(self, prompt_name, user, schema, on_token=None, on_retry=None):
+        if prompt_name == "stories":
+            self.calls["stories"].append(user)
+            while not self.release.is_set():
+                await asyncio.sleep(0.01)
+            self.calls["stories"].pop()
+        return await super().complete_json(prompt_name, user, schema, on_token, on_retry)
+
+
+def test_pause_and_resume():
+    llm = GatedLLM()
+    with TestClient(create_app(llm=llm)) as client:
+        run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+        deadline = time.time() + 10
+        while not llm.calls["stories"] and time.time() < deadline:
+            time.sleep(0.02)
+        assert client.post(f"/api/runs/{run_id}/resume").status_code == 409
+        assert client.post(f"/api/runs/{run_id}/pause").status_code == 200
+        wait_status(client, run_id, ("paused",))
+        assert client.post(f"/api/runs/{run_id}/pause").status_code == 409
+
+        llm.release.set()
+        assert client.post(f"/api/runs/{run_id}/resume").status_code == 200
+        run = wait_status(client, run_id, ("done", "failed"))
+        assert run["status"] == "done", run.get("error")
+        assert run["result"]["stats"]["stories_count"] == 2
+        types = [t for t, _ in read_sse(client, f"/api/runs/{run_id}/events")]
+        assert types.index("run_paused") < types.index("run_resumed") < types.index("run_finished")
+        assert types.count("requirement_created") == 2
+
+
+def test_concurrency_at_start_and_during_run():
+    llm = GatedLLM()
+    with TestClient(create_app(llm=llm)) as client:
+        assert client.post("/api/demos/boutique-delivery/run", json={"concurrency": 0}).status_code == 422
+        run_id = client.post("/api/demos/boutique-delivery/run",
+                             json={"skip_questions": True, "concurrency": 3}).json()["run_id"]
+        assert client.get(f"/api/runs/{run_id}").json()["concurrency"] == 3
+        deadline = time.time() + 10
+        while not llm.calls["stories"] and time.time() < deadline:
+            time.sleep(0.02)
+
+        assert client.put(f"/api/runs/{run_id}/concurrency", json={"value": 6}).json() == {"concurrency": 6}
+        assert client.put(f"/api/runs/{run_id}/concurrency", json={"value": 99}).status_code == 422
+        assert client.put("/api/runs/nope/concurrency", json={"value": 2}).status_code == 404
+        llm.release.set()
+        run = wait_status(client, run_id, ("done", "failed"))
+        assert run["status"] == "done" and run["concurrency"] == 6
+        events = read_sse(client, f"/api/runs/{run_id}/events")
+        started = next(d for t, d in events if t == "run_started")
+        assert started["concurrency"] == 3
+        assert [d for t, d in events if t == "concurrency_changed"] == [{"concurrency": 6}]
+
+
+def test_prompt_override_and_reset(client):
+    from app.prompts import load_prompt
+
+    prompts = {p["name"]: p for p in client.get("/api/prompts").json()}
+    assert "tasks" in prompts and not prompts["tasks"]["overridden"]
+    original = prompts["tasks"]["text"]
+
+    edited = client.put("/api/prompts/tasks", json={"text": original + "\nДобавлено в интерфейсе."}).json()
+    assert edited["overridden"] and edited["version"] != edited["default_version"]
+    assert load_prompt("tasks").text.endswith("Добавлено в интерфейсе.")
+    run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+    assert wait_status(client, run_id, ("done", "failed"))["prompt_versions"]["tasks"] == edited["version"]
+
+    same = client.put("/api/prompts/tasks", json={"text": original}).json()
+    assert not same["overridden"]
+    client.put("/api/prompts/tasks", json={"text": "другой"})
+    assert client.delete("/api/prompts/tasks").json()["text"] == original
+    assert client.put("/api/prompts/tasks", json={"text": "  "}).status_code == 422
+    assert client.put("/api/prompts/../config", json={"text": "x"}).status_code == 404
+    assert client.put("/api/prompts/nope", json={"text": "x"}).status_code == 404
+
+
+def test_providers_crud_and_run_model(client):
+    providers = client.get("/api/providers").json()
+    assert providers[0]["id"] == "env" and providers[0]["default_model"] == "fake-model"
+
+    body = {"name": "ARCMUX", "base_url": "https://api.example.test/v1/", "api_key": "secret-key",
+            "default_model": "gpt-x"}
+    created = client.post("/api/providers", json=body).json()
+    assert created["has_key"] and created["base_url"] == "https://api.example.test/v1"
+    assert "secret-key" not in json.dumps(client.get("/api/providers").json())
+
+    # ключ не передан — сохранённый остаётся; пустая строка — убирает
+    kept = client.put(f"/api/providers/{created['id']}", json={**body, "api_key": None, "name": "Другое имя"}).json()
+    assert kept["has_key"] and kept["name"] == "Другое имя"
+    assert not client.put(f"/api/providers/{created['id']}", json={**body, "api_key": ""}).json()["has_key"]
+    assert client.post("/api/providers", json={**body, "base_url": "ftp://x"}).status_code == 422
+
+    # прогон с серверной моделью по умолчанию; модель записывается в прогон
+    run_id = client.post("/api/demos/boutique-delivery/run",
+                         json={"skip_questions": True, "provider_id": "env"}).json()["run_id"]
+    assert wait_status(client, run_id, ("done", "failed"))["model"] == "fake-model"
+    r = client.post("/api/demos/boutique-delivery/run", json={"provider_id": "nope", "model": "m"})
+    assert r.status_code == 422
+
+    assert client.delete(f"/api/providers/{created['id']}").status_code == 200
+    assert client.delete(f"/api/providers/{created['id']}").status_code == 404
+    assert [p["id"] for p in client.get("/api/providers").json()] == ["env"]
+
+
+def test_bench_reports(client):
+    data = client.get("/api/bench").json()
+    assert data["summary"]["title"].startswith("Проверяющие агенты")
+    ids = [s["id"] for s in data["series"]]
+    assert "2026-11-14" in ids and ids == sorted(ids, reverse=True)
+    assert all(s["markdown"].startswith("# ") for s in data["series"])
 
 
 def test_rejects_pdf_and_empty_epic(client):

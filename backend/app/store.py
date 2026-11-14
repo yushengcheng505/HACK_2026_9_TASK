@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS events (
     data TEXT NOT NULL,
     PRIMARY KEY (run_id, seq)
 );
+CREATE TABLE IF NOT EXISTS providers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    base_url TEXT NOT NULL,
+    api_key TEXT,
+    api_key_env TEXT,
+    json_mode TEXT NOT NULL DEFAULT 'json_schema',
+    default_model TEXT,
+    created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS prompt_versions (
     name TEXT NOT NULL,
     version TEXT NOT NULL,
@@ -63,16 +73,44 @@ class Store:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        columns = {r[1] for r in self.db.execute("PRAGMA table_info(runs)")}
+        if "provider_id" not in columns:
+            self.db.execute("ALTER TABLE runs ADD COLUMN provider_id TEXT")
+        if "concurrency" not in columns:
+            self.db.execute("ALTER TABLE runs ADD COLUMN concurrency INTEGER")
         self.lock = threading.Lock()
 
-    def create_run(self, id: str, title: str, origin: str, demo_id: str | None, skip_questions: bool) -> None:
+    def create_run(self, id: str, title: str, origin: str, demo_id: str | None, skip_questions: bool,
+                   provider_id: str | None = None, concurrency: int | None = None) -> None:
         now = time.time()
         with self.lock, self.db:
             self.db.execute(
-                "INSERT INTO runs (id, created_at, updated_at, title, status, origin, demo_id, skip_questions)"
-                " VALUES (?, ?, ?, ?, 'running', ?, ?, ?)",
-                (id, now, now, title, origin, demo_id, int(skip_questions)),
+                "INSERT INTO runs (id, created_at, updated_at, title, status, origin, demo_id, skip_questions,"
+                " provider_id, concurrency) VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)",
+                (id, now, now, title, origin, demo_id, int(skip_questions), provider_id, concurrency),
             )
+
+    # ---------- провайдеры моделей ----------
+
+    def list_providers(self) -> list[dict]:
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM providers ORDER BY created_at").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_provider(self, id: str) -> dict | None:
+        with self.lock:
+            row = self.db.execute("SELECT * FROM providers WHERE id = ?", (id,)).fetchone()
+        return dict(row) if row else None
+
+    def save_provider(self, provider: dict) -> None:
+        fields = ("id", "name", "base_url", "api_key", "api_key_env", "json_mode", "default_model", "created_at")
+        with self.lock, self.db:
+            self.db.execute(f"INSERT OR REPLACE INTO providers ({', '.join(fields)}) VALUES ({', '.join('?' * len(fields))})",
+                            tuple(provider.get(f) for f in fields))
+
+    def delete_provider(self, id: str) -> None:
+        with self.lock, self.db:
+            self.db.execute("DELETE FROM providers WHERE id = ?", (id,))
 
     def update_run(self, id: str, **fields) -> None:
         fields = {k: json.dumps(v, ensure_ascii=False) if k in JSON_FIELDS and v is not None else v

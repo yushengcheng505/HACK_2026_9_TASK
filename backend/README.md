@@ -8,7 +8,7 @@ Python 3.12 (uv), FastAPI, LangGraph. Эпик + документы + контр
 ```bash
 cp .env.example .env        # адрес и модель LLM
 uv sync
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 8000 --timeout-graceful-shutdown 2
 uv run pytest               # тесты с поддельной LLM, сеть не нужна
 uv run langgraph dev        # граф в LangGraph Studio (нужен пакет langgraph-cli[inmem])
 ```
@@ -26,7 +26,17 @@ uv run langgraph dev        # граф в LangGraph Studio (нужен паке�
 не поддерживает structured output. Схема ответа в любом случае есть в системном промпте,
 ответ проверяется Pydantic, при ошибке — до двух повторов с текстом ошибки.
 
-Промпты — `prompts/*.md`. Версия (хеш) каждого промпта сохраняется с запуском.
+Провайдер из `.env` — по умолчанию (id `env`). Другие провайдеры добавляются в интерфейсе
+(раздел «Модели») и хранятся в `data/app.db`; ключ наружу не отдаётся. Провайдер и модель
+выбираются при запуске и записываются в прогон.
+
+Промпты — `prompts/*.md`. Правки из интерфейса (раздел «Промпты») лежат в `data/prompt_overrides/`
+и действуют на следующие прогоны; исходники не меняются, сброс удаляет правку.
+Версия (хеш) каждого промпта сохраняется с запуском.
+
+Сколько запросов к модели идёт одновременно, задаётся при запуске и меняется во время прогона
+(в том числе на паузе) — `PUT /api/runs/<id>/concurrency`, 1–32. `LLM_CONCURRENCY` — значение
+по умолчанию. Новый лимит действует сразу: идущие запросы доживают, следующие ждут по новому.
 
 ## Проверка результата
 `REVIEW_MODE=review` (по умолчанию): рецензент на каждую историю, редактор стыков, упрощатель,
@@ -56,6 +66,11 @@ curl -N localhost:8000/api/runs/<run_id>/events          # живой поток
 curl -X POST localhost:8000/api/runs/<run_id>/answers -H 'content-type: application/json' -d '{"answers":{}}'
 curl -OJ localhost:8000/api/runs/<run_id>/export/docx    # json | xlsx | docx
 curl -N 'localhost:8000/api/runs/<run_id>/events?replay=1'  # проигрывание записанного прогона
+curl -X POST localhost:8000/api/runs/<run_id>/pause         # пауза; /resume — продолжить с контрольной точки
+curl -X PUT localhost:8000/api/runs/<run_id>/concurrency -H 'content-type: application/json' -d '{"value":4}'
+curl localhost:8000/api/providers                            # провайдеры; /providers/<id>/models — список моделей
+curl localhost:8000/api/prompts                              # промпты; PUT/DELETE /prompts/<имя> — правка и сброс
+curl localhost:8000/api/bench                                # отчёты бенчмарка: сводка и серии
 ```
 
 ## Структура
@@ -67,7 +82,9 @@ app/
   language.py   эвристика целевого языка
   context.py    отбор фрагментов в бюджет промпта (BM25)
   llm.py        прослойка OpenAI-совместимого API
-  prompts.py    загрузка промптов и их версий
+  prompts.py    загрузка промптов, их версий и правок из интерфейса
+  providers.py  провайдеры моделей: встроенный из .env и сохранённые
+  limiter.py    лимит параллельных запросов к модели, меняется на лету
   checks.py     проверки кодом и покрытие
   graph.py      граф LangGraph
   exporters.py  JSON / XLSX / DOCX

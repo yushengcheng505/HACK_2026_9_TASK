@@ -7,6 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
 
 from app.config import get_settings
+from app.limiter import Limiter
 from app.llm import LLM, OpenAICompatLLM
 from app.schemas import Language, Requirement, Source, Story
 
@@ -43,6 +44,11 @@ def _default_llm() -> OpenAICompatLLM:
 
 def get_llm(config: RunnableConfig) -> LLM:
     return (config.get("configurable") or {}).get("llm") or _default_llm()
+
+
+def get_limiter(config: RunnableConfig) -> Limiter:
+    """Ограничитель параллельных запросов прогона; вне раннера (тесты, бенчмарк) — по LLM_CONCURRENCY."""
+    return (config.get("configurable") or {}).get("limiter") or Limiter(get_settings().llm_concurrency)
 
 
 async def ask(config: RunnableConfig, node: str, prompt: str, user: str, schema):

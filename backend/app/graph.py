@@ -14,7 +14,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from app.calls import DECISIONS_HEADING, ask, emit, get_llm
+from app.calls import DECISIONS_HEADING, ask, emit, get_limiter, get_llm
 from app.calls import decisions_block as _decisions_block
 from app.calls import language_line as _language_line
 from app.calls import requirements_block as _requirements_block
@@ -218,7 +218,7 @@ async def tasks_node(state: State, config: RunnableConfig) -> State:
     settings = get_settings()
     sources = _sources(state)
     reqs = {r.id: r for r in _requirements(state)}
-    semaphore = asyncio.Semaphore(settings.llm_concurrency)
+    semaphore = get_limiter(config)
     fresh: dict[str, list] = {}
     responses: list[TaskResponse] = []
     story_list = "\n".join(f"- {s.id}: {s.title} (требования: {', '.join(s.requirement_ids) or '—'})"
