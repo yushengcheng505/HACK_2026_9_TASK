@@ -55,7 +55,8 @@ class Runner:
     def resume(self, run_id: str, answers: dict[str, str], llm: LLM | None = None) -> None:
         self.llms[run_id] = llm or self.llms.get(run_id, self.llm)
         self.store.update_run(run_id, status="running")
-        self._spawn(run_id, Command(resume=answers))
+        # LangGraph принимает пустой dict за пустую карту id прерываний и ничего не возобновляет
+        self._spawn(run_id, Command(resume=answers or {"skipped": True}))
 
     def pause(self, run_id: str) -> bool:
         """Останавливает фоновую задачу. Граф сохраняет состояние после каждого шага — прерванный шаг

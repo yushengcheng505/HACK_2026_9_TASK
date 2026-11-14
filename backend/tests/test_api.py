@@ -88,6 +88,16 @@ def test_questions_then_answers(client):
     assert client.post(f"/api/runs/{run_id}/answers", json={}).status_code == 409
 
 
+def test_empty_answers_accept_recommendations(client):
+    run_id = client.post("/api/demos/boutique-delivery/run", json={}).json()["run_id"]
+    wait_status(client, run_id, ("waiting_answers", "failed"))
+    assert client.post(f"/api/runs/{run_id}/answers", json={"answers": {}}).status_code == 200
+    run = wait_status(client, run_id, ("done", "failed"))
+    assert run["status"] == "done"
+    assert run["result"]["questions"][0]["answer"] is None
+    assert any("принято без ответа" in a for a in run["result"]["assumptions"])
+
+
 def test_answers_to_unknown_questions_are_rejected(client):
     run_id = client.post("/api/demos/boutique-delivery/run", json={}).json()["run_id"]
     wait_status(client, run_id, ("waiting_answers", "failed"))

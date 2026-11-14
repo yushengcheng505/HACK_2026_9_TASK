@@ -168,7 +168,8 @@ async def ask_user_node(state: State) -> State:
     questions = [Question.model_validate(q) for q in state.get("questions", [])]
     answers: dict[str, str] = {}
     if questions and not state.get("skip_questions", False):
-        answers = interrupt({"questions": [q.model_dump() for q in questions]}) or {}
+        resumed = interrupt({"questions": [q.model_dump() for q in questions]}) or {}
+        answers = {k: v for k, v in resumed.items() if k in {q.id for q in questions}}
     assumptions = list(state.get("assumptions", []))
     language = Language.model_validate(state["language"])
     for q in questions:
