@@ -74,22 +74,33 @@ async def test_review_only_run_scores_defect_from_start_state():
     assert score["tasks_before"] == 4 and "reviewer" in score["calls_by_role"]
 
 
-def test_variant_llm_applies_token_limit_and_prompt_additions(tmp_path):
+def test_variant_llm_applies_token_limit_and_prompt_edits(tmp_path, monkeypatch):
     from app.config import get_settings
     from app.prompts import load_prompt
-    from bench.harness import BRIEF, variant_llm
+    from bench import harness
 
-    brief = variant_llm("review-brief-32k", tmp_path)
-    assert brief.settings.llm_max_tokens == 32768
-    assert load_prompt("reviewer", brief.settings.prompts_dir).text.rstrip().endswith(BRIEF.strip().splitlines()[-1])
-    assert load_prompt("tasks", brief.settings.prompts_dir).text == load_prompt("tasks").text
-    assert variant_llm("review", tmp_path).settings.prompts_dir == get_settings().prompts_dir
+    monkeypatch.setitem(harness.VARIANTS, "probe", harness.Variant(
+        harness.FULL, max_tokens=32768,
+        prompts={"reviewer": (("Пиши по-русски.", "Пиши по-русски, кратко."), ("", "\n\n## Добавка"))}))
+    llm = harness.variant_llm("probe", tmp_path)
+    reviewer = load_prompt("reviewer", llm.settings.prompts_dir).text
+    assert llm.settings.llm_max_tokens == 32768
+    assert "Пиши по-русски, кратко." in reviewer and reviewer.rstrip().endswith("## Добавка")
+    assert load_prompt("tasks", llm.settings.prompts_dir).text == load_prompt("tasks").text
+    assert harness.variant_llm("review", tmp_path).settings.prompts_dir == get_settings().prompts_dir
 
 
-def test_prompt_edits_apply_to_current_prompts():
-    from app.config import get_settings
-    from bench.harness import EXAMPLES, FAILURES, SEVERITY, SKEPTIC_GAPS, _merge, edit_prompt
+def test_prompt_edit_that_does_not_apply_fails_loudly():
+    import pytest
 
-    for role, edits in _merge(SEVERITY, FAILURES, SKEPTIC_GAPS, EXAMPLES).items():
-        text = (get_settings().prompts_dir / f"{role}.md").read_text(encoding="utf-8")
-        assert edit_prompt(text, edits) != text
+    from bench.harness import edit_prompt
+
+    with pytest.raises(ValueError):
+        edit_prompt("текст промпта", (("фрагмента нет", "замена"),))
+
+
+def test_review_prompts_ask_for_brief_reasoning():
+    from app.prompts import load_prompt
+
+    for role in ("reviewer", "junction", "skeptic", "simplifier"):
+        assert "## Как рассуждать" in load_prompt(role).text

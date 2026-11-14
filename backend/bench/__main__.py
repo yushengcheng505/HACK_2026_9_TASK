@@ -141,7 +141,9 @@ def _rate(flags) -> str:
 
 
 def _present(rows: list[dict]) -> list[str]:
-    return [v for v in VARIANTS if any(r["variant"] == v for r in rows)]
+    """Варианты из прогонов: сначала известные в порядке VARIANTS, затем прежние, которых в списке уже нет."""
+    seen = list(dict.fromkeys(r["variant"] for r in rows))
+    return [v for v in VARIANTS if v in seen] + [v for v in seen if v not in VARIANTS]
 
 
 def report(out: Path) -> str:
