@@ -35,6 +35,17 @@ uv run langgraph dev        # граф в LangGraph Studio (нужен паке�
 (`true`/`false`) включают скептика и упрощателя. Журнал находок с вердиктами — поле `findings`
 результата и лист «Проверка» в XLSX.
 
+## Мини-бенчмарк проверки
+Сравнивает варианты `critic`, `review-noskeptic`, `review`, `review-nosimplifier` на той же модели:
+```bash
+uv run python -m bench e2e    --out bench/results/<метка>   # полные прогоны демо-эпика
+uv run python -m bench review --out bench/results/<метка>   # 7 внедрённых дефектов + контроль
+uv run python -m bench report --out bench/results/<метка>   # отчёт report.md
+```
+Дефекты внедряются в итоговые результаты прогонов из `data/app.db` (`bench/mutations.py`),
+готовые прогоны при перезапуске не повторяются. Детали — в плане
+`../docs/superpowers/plans/2026-11-14-review-workflow.md`.
+
 ## Быстрая проверка
 ```bash
 curl -X POST localhost:8000/api/demos/boutique-delivery/run -H 'content-type: application/json' -d '{}'

@@ -4,3 +4,5 @@ __pycache__/
 .env
 data/
 .langgraph_api/
+bench/results/**/*.json
+bench/results/**/*.running
