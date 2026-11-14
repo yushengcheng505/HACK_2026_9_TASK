@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AGENTS, AgentAvatar, TEAM_LABELS, teamAgents } from '@/entities/agent'
+import { AgentAvatar, ROSTER, TEAM_LABELS } from '@/entities/agent'
 import type { AgentState, AgentTeam } from '@/entities/agent'
 import { BrandName } from '@/shared/ui/BrandName'
 
@@ -29,7 +29,7 @@ export function AgentsPage() {
               Маленькие агенты <BrandName className="text-[34px]" />
             </h1>
             <p className="mt-2 text-[15px] text-fg-muted">
-              {AGENTS.length} ролей в трёх состояниях. Слева крупно, справа — в натуральную величину (40 px).
+              {ROSTER.length} ролей в трёх состояниях. Слева крупно, справа — в натуральную величину (40 px).
             </p>
           </div>
           <button
@@ -57,7 +57,7 @@ export function AgentsPage() {
               0{teamIndex + 1} · {TEAM_LABELS[team]}
             </h2>
             <div className="flex flex-col gap-3">
-              {teamAgents(team).map((agent) => (
+              {ROSTER.filter((agent) => agent.team === team).map((agent) => (
                 <div key={agent.id} className={GRID}>
                   <div className="flex flex-col justify-center">
                     <div className="font-display text-[16px] font-semibold">{agent.name}</div>

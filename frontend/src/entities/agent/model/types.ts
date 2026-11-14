@@ -2,6 +2,7 @@ export type AgentId =
   | 'requirements'
   | 'analyst'
   | 'stories'
+  | 'architect'
   | 'tasks'
   | 'reviewer'
   | 'junction'

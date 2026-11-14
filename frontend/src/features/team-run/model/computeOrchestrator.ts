@@ -1,5 +1,6 @@
-import { AGENTS } from '@/entities/agent'
+import { ROSTER, type AgentTeam } from '@/entities/agent'
 import { clamp } from '@/shared/lib/math'
+import { plural } from '@/shared/lib/plural'
 import { agentTiming, RUN_TIMELINE, TYPING_SPEED } from './timeline'
 import type { LogLine, OrchestratorMood, OrchestratorState } from './types'
 
@@ -12,14 +13,18 @@ interface LogEntry {
 
 const { waveStart } = RUN_TIMELINE
 
+const teamSize = (team: AgentTeam) => ROSTER.filter((agent) => agent.team === team).length
+const STAGES = teamSize('decomposition')
+const CHECKS = teamSize('review')
+
 const LOG: readonly LogEntry[] = [
   { at: 0.2, text: 'эпик получен' },
-  { at: 1.1, text: 'план: 4 этапа и 4 проверки' },
+  { at: 1.1, text: `план: ${STAGES} ${plural(STAGES, 'этап', 'этапа', 'этапов')} и ${CHECKS} ${plural(CHECKS, 'проверка', 'проверки', 'проверок')}` },
   { at: waveStart.decomposition + 0.1, text: 'раздаю декомпозицию' },
   { at: waveStart.review + 0.1, text: 'отдаю на проверку' },
-  ...AGENTS.map((agent, index) => ({
+  ...ROSTER.map((agent, index) => ({
     at: agentTiming(index).deliveredAt,
-    text: `${agent.name}: готово · ${index + 1}/${AGENTS.length}`,
+    text: `${agent.name}: готово · ${index + 1}/${ROSTER.length}`,
   })),
   { at: RUN_TIMELINE.assemblyStart, text: 'собираю итог' },
   { at: RUN_TIMELINE.complete, text: 'задачи готовы' },

@@ -1,4 +1,4 @@
-import { AGENTS, type AgentTeam } from '@/entities/agent'
+import { ROSTER, type AgentTeam } from '@/entities/agent'
 
 /** Все значения — секунды от начала прогона. */
 export const RUN_TIMELINE = {
@@ -27,8 +27,8 @@ export interface AgentTiming {
 
 export function agentTiming(index: number): AgentTiming {
   const t = RUN_TIMELINE
-  const agent = AGENTS[index]
-  const order = AGENTS.slice(0, index).filter((other) => other.team === agent.team).length
+  const agent = ROSTER[index]
+  const order = ROSTER.slice(0, index).filter((other) => other.team === agent.team).length
   const waveStart = t.waveStart[agent.team]
   const dispatchedAt = waveStart + t.dispatchStagger * order
   const doneAt = waveStart + t.firstDone + t.doneStagger * order
@@ -40,7 +40,7 @@ export function agentTiming(index: number): AgentTiming {
   }
 }
 
-const lastDelivered = Math.max(...AGENTS.map((_, index) => agentTiming(index).deliveredAt))
+const lastDelivered = Math.max(...ROSTER.map((_, index) => agentTiming(index).deliveredAt))
 
 /** Моменты смены этапов «Анализ → Декомпозиция → Проверка → Сборка → готово». */
 export const PHASE_STARTS = [

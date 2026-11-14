@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import type { PromptInfo } from '@/features/edit-prompts'
 import { listPrompts, resetPrompt, savePrompt } from '@/features/edit-prompts'
 import type { AgentState, AgentTeam } from '@/entities/agent'
-import { AGENTS, AgentAvatar, TEAM_LABELS } from '@/entities/agent'
+import { AgentAvatar, ROSTER, TEAM_LABELS } from '@/entities/agent'
 
 const ROLES: Record<string, string> = {
   requirements: 'Составитель требований',
   analyst: 'Аналитик',
   stories: 'Автор историй',
+  architect: 'Архитектор интеграции',
   tasks: 'Генератор задач',
   reviewer: 'Рецензент',
   junction: 'Редактор стыков',
@@ -26,7 +27,7 @@ const GROUPS: { id: GroupId; label: string }[] = [
   { id: 'other', label: 'Прочее' },
 ]
 
-const agentOf = (name: string) => AGENTS.find((agent) => agent.id === name)
+const agentOf = (name: string) => ROSTER.find((agent) => agent.id === name)
 const groupOf = (name: string): GroupId => agentOf(name)?.team ?? 'other'
 
 export function PromptsPanel() {
@@ -93,7 +94,7 @@ export function PromptsPanel() {
             Правка действует на следующие прогоны. Версия промпта записывается в каждый прогон.
           </p>
           <div className="flex items-center gap-1" aria-hidden="true">
-            {AGENTS.map((agent) => (
+            {ROSTER.map((agent) => (
               <AgentAvatar key={agent.id} id={agent.id} size={24} state={busy && agent.id === selected ? 'working' : 'waiting'} />
             ))}
           </div>

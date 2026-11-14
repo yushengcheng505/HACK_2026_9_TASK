@@ -12,6 +12,12 @@ export const AGENTS: readonly Agent[] = [
   { id: 'skeptic', team: 'review', name: 'Скептик', focus: 'ложные находки' },
 ]
 
+/** Архитектор интеграции: в реальных прогонах пока не участвует, поэтому его нет в AGENTS; витрина, консоль и сцена главной берут его из ROSTER. */
+export const ARCHITECT: Agent = { id: 'architect', team: 'decomposition', name: 'Архитектор', focus: 'план интеграции' }
+
+/** Все нарисованные роли в порядке работы: Архитектор — перед Генератором задач. */
+export const ROSTER: readonly Agent[] = AGENTS.flatMap((agent) => (agent.id === 'tasks' ? [ARCHITECT, agent] : [agent]))
+
 export const TEAM_LABELS: Record<AgentTeam, string> = {
   decomposition: 'Декомпозиция',
   review: 'Проверка',

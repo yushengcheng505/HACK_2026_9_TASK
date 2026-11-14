@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Provider, ProviderInput } from '@/features/manage-providers'
 import { JSON_MODES, createProvider, deleteProvider, listModels, listProviders, updateProvider } from '@/features/manage-providers'
-import { AGENTS, AgentAvatar } from '@/entities/agent'
+import { AgentAvatar, ROSTER } from '@/entities/agent'
 
 const NEW = 'new'
 
@@ -126,7 +126,7 @@ export function ModelsPanel() {
             Любой OpenAI-совместимый API. Модель выбирается на экране запуска и записывается в прогон.
           </p>
           <div className="flex items-center gap-1" aria-hidden="true">
-            {AGENTS.map((agent) => (
+            {ROSTER.map((agent) => (
               <AgentAvatar key={agent.id} id={agent.id} size={24} state={working ? 'working' : 'waiting'} />
             ))}
           </div>

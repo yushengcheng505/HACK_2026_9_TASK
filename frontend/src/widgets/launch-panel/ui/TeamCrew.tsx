@@ -1,4 +1,4 @@
-import { AGENTS, AgentAvatar } from '@/entities/agent'
+import { AgentAvatar, ROSTER } from '@/entities/agent'
 
 interface TeamCrewProps {
   /** В форме есть текст эпика. */
@@ -8,11 +8,11 @@ interface TeamCrewProps {
 
 /** Маленькая команда в шапке формы: ждёт задачу, а при запуске берётся за работу. */
 export function TeamCrew({ ready, launching }: TeamCrewProps) {
-  const note = launching ? 'команда приступает…' : ready ? 'команда готова, можно запускать' : `NAPS и ${AGENTS.length} агентов ждут задачу`
+  const note = launching ? 'команда приступает…' : ready ? 'команда готова, можно запускать' : `NAPS и ${ROSTER.length} агентов ждут задачу`
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex items-center gap-1" aria-hidden="true">
-        {AGENTS.map((agent) => (
+        {ROSTER.map((agent) => (
           <AgentAvatar key={agent.id} id={agent.id} size={28} state={launching ? 'working' : 'waiting'} />
         ))}
       </div>

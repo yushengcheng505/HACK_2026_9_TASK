@@ -69,6 +69,14 @@ const DoneBadge = () => (
   </g>
 )
 
+/** Схема Архитектора: три сервиса и связи между ними. */
+const ARCHITECT_NODES = [
+  [4, 9.5],
+  [10, 11.5],
+  [6, 18.5],
+] as const
+const ARCHITECT_LINKS = ['M4 9.5 L10 11.5', 'M10 11.5 L6 18.5', 'M6 18.5 L4 9.5'] as const
+
 interface MiniProps {
   state: AgentState
   blinkDelay: string
@@ -117,6 +125,32 @@ const MINIS: Record<AgentId, (props: MiniProps) => ReactNode> = {
       <ellipse cx="22" cy="13" rx="13" ry="4" fill={palette.brandDeep} transform="rotate(-9 22 13)" />
       <circle cx="19.5" cy="8.6" r="1.8" fill={palette.brandDeep} />
       <Face state={state} ink={palette.ink} blinkDelay={blinkDelay} />
+    </>
+  ),
+  architect: ({ state, blinkDelay }) => (
+    <>
+      <Head fill={palette.fg} />
+      <Face state={state} ink={palette.ink} blinkDelay={blinkDelay} />
+      <g transform="rotate(-10 7 13)">
+        <rect x="0.5" y="5" width="13" height="17.5" rx="1.6" fill={palette.brandDeep} stroke={palette.brand} strokeWidth="1.2" />
+        <g opacity={state === 'waiting' ? 0.45 : 1}>
+          {ARCHITECT_LINKS.map((d, index) => (
+            <path
+              key={d}
+              className={state === 'working' ? 'av-draw' : undefined}
+              style={state === 'working' ? { animationDelay: `${index * 0.25}s` } : undefined}
+              pathLength={1}
+              d={d}
+              stroke={palette.mint}
+              strokeWidth="1.1"
+              {...line}
+            />
+          ))}
+        </g>
+        {ARCHITECT_NODES.map(([cx, cy]) => (
+          <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.7" fill={palette.mint} />
+        ))}
+      </g>
     </>
   ),
   tasks: ({ state, blinkDelay }) => (
@@ -222,6 +256,7 @@ const PHASE: Record<AgentId, { blink: string; motion: string }> = {
   requirements: { blink: '0s', motion: '0s' },
   analyst: { blink: '-1.3s', motion: '-0.9s' },
   stories: { blink: '-2.6s', motion: '-2.1s' },
+  architect: { blink: '-3.7s', motion: '-1.2s' },
   tasks: { blink: '-0.7s', motion: '-0.4s' },
   reviewer: { blink: '-3.4s', motion: '-1.6s' },
   junction: { blink: '-1.9s', motion: '-2.8s' },

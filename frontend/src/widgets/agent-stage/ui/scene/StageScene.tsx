@@ -23,7 +23,7 @@ export function StageScene({ frame }: StageSceneProps) {
           viewBox={`0 0 ${SCENE_SIZE.width} ${SCENE_SIZE.height}`}
           className="absolute inset-0 block size-full"
           role="img"
-          aria-label="Оркестратор NAPS отправляет задачи четырём агентам декомпозиции, затем четырём проверяющим и собирает их ответы"
+          aria-label="Оркестратор NAPS отправляет задачи пяти агентам декомпозиции, затем четырём проверяющим и собирает их ответы"
         >
           <TeamLabels />
           <RouteTrails trails={trails} />

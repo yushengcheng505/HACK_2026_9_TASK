@@ -1,4 +1,4 @@
-import { AGENTS, type AgentId, type AgentTeam } from '@/entities/agent'
+import { ROSTER, type AgentId, type AgentTeam } from '@/entities/agent'
 import type { Point, QuadCurve } from '@/shared/lib/math'
 
 /** Координаты в системе viewBox сцены 1200×600. */
@@ -7,7 +7,22 @@ export const SCENE_SIZE = { width: 1200, height: 600 } as const
 /** Маленькие модели роботов (рамка 48×40, голова 32×26) увеличены так, что голова на сцене — 80×65. */
 export const AGENT_FIGURE_SCALE = 2.5
 
-const COLUMNS = [560, 735, 910, 1085] as const
+/** Шаг между роботами одинаковый в обоих рядах; ряд покороче стоит по центру под длинным. */
+const COLUMN_STEP = 144
+const FIRST_COLUMN = 538
+
+const teamSize = (team: AgentTeam) => ROSTER.filter((agent) => agent.team === team).length
+const WIDEST_ROW = Math.max(teamSize('decomposition'), teamSize('review'))
+
+const columnsFor = (team: AgentTeam) => {
+  const start = FIRST_COLUMN + ((WIDEST_ROW - teamSize(team)) * COLUMN_STEP) / 2
+  return Array.from({ length: teamSize(team) }, (_, index) => start + index * COLUMN_STEP)
+}
+
+const COLUMNS: Record<AgentTeam, readonly number[]> = {
+  decomposition: columnsFor('decomposition'),
+  review: columnsFor('review'),
+}
 
 export interface TeamRow {
   /** Центр корпусов роботов этой команды по Y. */
@@ -35,12 +50,12 @@ export interface AgentSlot {
 }
 
 const columnOf = (id: AgentId) => {
-  const agent = AGENTS.find((a) => a.id === id)!
-  return AGENTS.filter((a) => a.team === agent.team).indexOf(agent)
+  const agent = ROSTER.find((a) => a.id === id)!
+  return ROSTER.filter((a) => a.team === agent.team).indexOf(agent)
 }
 
 export const AGENT_SLOTS = Object.fromEntries(
-  AGENTS.map((agent) => [agent.id, { cx: COLUMNS[columnOf(agent.id)], bodyY: TEAM_ROWS[agent.team].bodyY }]),
+  ROSTER.map((agent) => [agent.id, { cx: COLUMNS[agent.team][columnOf(agent.id)], bodyY: TEAM_ROWS[agent.team].bodyY }]),
 ) as Record<AgentId, AgentSlot>
 
 export interface FlightRoute {
@@ -70,7 +85,7 @@ const NAPS_PORTS = {
 function routeFor(id: AgentId): FlightRoute {
   const { cx, bodyY } = AGENT_SLOTS[id]
   const column = columnOf(id)
-  const team = AGENTS.find((a) => a.id === id)!.team
+  const team = ROSTER.find((a) => a.id === id)!.team
   const top: Point = [cx, bodyY - AGENT_BOUNDS.top - 4]
   const bottom: Point = [cx, bodyY + AGENT_BOUNDS.bottom + 6]
 
@@ -86,7 +101,7 @@ function routeFor(id: AgentId): FlightRoute {
   }
 }
 
-export const FLIGHT_ROUTES = Object.fromEntries(AGENTS.map((agent) => [agent.id, routeFor(agent.id)])) as Record<
+export const FLIGHT_ROUTES = Object.fromEntries(ROSTER.map((agent) => [agent.id, routeFor(agent.id)])) as Record<
   AgentId,
   FlightRoute
 >
