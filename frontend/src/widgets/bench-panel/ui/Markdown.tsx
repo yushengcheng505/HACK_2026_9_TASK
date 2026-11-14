@@ -1,56 +1,5 @@
 import type { ReactNode } from 'react'
-
-type Block =
-  | { kind: 'h'; level: number; text: string }
-  | { kind: 'p'; text: string }
-  | { kind: 'ul'; items: string[] }
-  | { kind: 'ol'; items: string[] }
-  | { kind: 'table'; head: string[]; rows: string[][] }
-
-const LIST = /^(?:[-*]|\d+\.)\s+/
-const cells = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
-
-/** Разбор подмножества markdown из отчётов бенчмарка: заголовки, абзацы, списки, pipe-таблицы. */
-function parse(source: string): Block[] {
-  const blocks: Block[] = []
-  const lines = source.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i]
-    const line = raw.trim()
-    if (!line) continue
-    const heading = line.match(/^(#{1,4})\s+(.*)$/)
-    if (heading) {
-      blocks.push({ kind: 'h', level: heading[1].length, text: heading[2] })
-      continue
-    }
-    if (line.startsWith('|')) {
-      const rows: string[][] = []
-      while (i < lines.length && lines[i].trim().startsWith('|')) rows.push(cells(lines[i++]))
-      i--
-      const [head = [], , ...body] = rows
-      blocks.push({ kind: 'table', head, rows: rows[1]?.every((c) => /^:?-+:?$/.test(c)) ? body : rows.slice(1) })
-      continue
-    }
-    if (LIST.test(line)) {
-      const kind = /^\d+\./.test(line) ? 'ol' : 'ul'
-      const items: string[] = []
-      while (i < lines.length) {
-        const next = lines[i].trim()
-        if (LIST.test(next)) items.push(next.replace(LIST, ''))
-        else if (next && /^\s/.test(lines[i]) && !next.startsWith('|')) items[items.length - 1] += ` ${next}`
-        else break
-        i++
-      }
-      i--
-      blocks.push({ kind, items })
-      continue
-    }
-    const text = [line]
-    while (i + 1 < lines.length && lines[i + 1].trim() && !/^(#|\||[-*]\s|\d+\.\s)/.test(lines[i + 1].trim())) text.push(lines[++i].trim())
-    blocks.push({ kind: 'p', text: text.join(' ') })
-  }
-  return blocks
-}
+import { headingId, parse } from '../model/markdown'
 
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
@@ -62,7 +11,7 @@ function inline(text: string): ReactNode[] {
       )
     if (part.startsWith('`') && part.endsWith('`') && part.length > 2)
       return (
-        <code key={i} className="rounded bg-panel px-1.5 py-0.5 font-mono text-[0.88em] text-mint">
+        <code key={i} className="rounded-md bg-panel px-1.5 py-0.5 font-mono text-[0.88em] text-mint">
           {part.slice(1, -1)}
         </code>
       )
@@ -78,7 +27,7 @@ export function Markdown({ source }: { source: string }) {
       {parse(source).map((block, i) => {
         if (block.kind === 'h')
           return (
-            <h3 key={i} className={`font-display font-semibold text-fg ${HEADING[block.level]}`}>
+            <h3 key={i} id={headingId(i)} className={`scroll-mt-6 font-display font-semibold text-fg ${HEADING[block.level]}`}>
               {inline(block.text)}
             </h3>
           )
@@ -94,12 +43,15 @@ export function Markdown({ source }: { source: string }) {
           )
         }
         return (
-          <div key={i} className="overflow-x-auto rounded-lg border border-line">
+          <div key={i} className="overflow-x-auto rounded-2xl border border-line bg-ink/40">
             <table className="w-full border-collapse text-[13px]">
               <thead>
                 <tr className="bg-panel">
                   {block.head.map((cell, j) => (
-                    <th key={j} className="px-3 py-2 text-left font-mono text-[11px] font-medium whitespace-nowrap text-fg-dim">
+                    <th
+                      key={j}
+                      className="px-4 py-2.5 text-left font-mono text-[11px] font-medium whitespace-nowrap text-fg-dim"
+                    >
                       {inline(cell)}
                     </th>
                   ))}
@@ -109,7 +61,7 @@ export function Markdown({ source }: { source: string }) {
                 {block.rows.map((row, j) => (
                   <tr key={j} className="border-t border-line hover:bg-panel/60">
                     {row.map((cell, k) => (
-                      <td key={k} className={`px-3 py-2 align-top ${k === 0 ? 'min-w-[260px] text-fg-soft' : 'font-mono tabular-nums whitespace-nowrap'}`}>
+                      <td key={k} className={`px-4 py-2.5 align-top ${k === 0 ? 'min-w-[200px] text-fg-soft' : 'font-mono tabular-nums whitespace-nowrap'}`}>
                         {inline(cell)}
                       </td>
                     ))}

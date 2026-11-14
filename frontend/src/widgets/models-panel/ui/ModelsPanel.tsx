@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { Provider, ProviderInput } from '@/features/manage-providers'
 import { JSON_MODES, createProvider, deleteProvider, listModels, listProviders, updateProvider } from '@/features/manage-providers'
-import { SectionHeader } from '@/shared/ui/SectionHeader'
+import { AGENTS, AgentAvatar } from '@/entities/agent'
 
 const NEW = 'new'
 
@@ -24,10 +24,14 @@ const toInput = (p: Provider): ProviderInput => ({
   default_model: p.default_model,
 })
 
+const cardClass = 'rounded-[28px] border border-line bg-surface shadow-[0_30px_80px_rgba(0,0,0,0.45)]'
 const fieldClass =
-  'w-full rounded-xl border border-line-input bg-ink px-3.5 py-2.5 text-[14px] text-fg placeholder:text-fg-dim/60 focus:border-brand disabled:opacity-60'
-const labelClass = 'flex flex-col gap-1.5'
-const captionClass = 'font-mono text-[11px] tracking-[0.1em] text-fg-dim uppercase'
+  'min-h-12 w-full rounded-2xl border border-line-input bg-ink px-4 text-[14px] text-fg transition-colors duration-150 placeholder:text-fg-dim/60 focus:border-brand disabled:cursor-not-allowed disabled:opacity-60'
+const labelClass = 'flex flex-col gap-2'
+const captionClass = 'font-mono text-[12px] tracking-[0.1em] text-fg-dim uppercase'
+const tagClass = 'rounded-full border border-line-strong px-2.5 py-0.5 font-mono text-[11px] text-fg-dim'
+
+const initial = (name: string) => name.match(/[\p{L}\p{N}+]/u)?.[0] ?? '·'
 
 type Check = { state: 'idle' } | { state: 'busy' } | { state: 'ok'; models: string[] } | { state: 'error'; message: string }
 
@@ -106,48 +110,95 @@ export function ModelsPanel() {
   const set = <K extends keyof ProviderInput>(key: K, value: ProviderInput[K]) => setForm((f) => ({ ...f, [key]: value }))
   const models = check.state === 'ok' ? check.models : []
 
-  return (
-    <div className="flex h-full flex-col overflow-y-auto">
-      <SectionHeader index="03" kicker="Модели" title="Провайдеры и модели">
-        <span className="max-w-[360px] text-[13px] leading-relaxed text-fg-dim">
-          Любой OpenAI-совместимый API. Модель выбирается на экране запуска и записывается в прогон.
-        </span>
-      </SectionHeader>
+  const working = saving || check.state === 'busy'
+  const jsonLabel = JSON_MODES.find((m) => m.id === form.json_mode)?.label
 
-      <div className="grid gap-6 px-8 py-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <nav className="flex flex-col gap-2" aria-label="Провайдеры">
-          {providers === null && <div className="h-16 animate-pulse rounded-xl border border-line bg-panel" />}
-          {providers?.map((p) => (
+  return (
+    <div className="flex h-full flex-col overflow-y-auto bg-ink">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+        <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
+          Провайдеры и модели.
+          <br />
+          <span className="text-brand">Одна голова на всю команду.</span>
+        </h1>
+        <div className="flex flex-col items-start gap-3">
+          <p className="m-0 max-w-[380px] text-[14px] leading-[1.6] text-fg-muted">
+            Любой OpenAI-совместимый API. Модель выбирается на экране запуска и записывается в прогон.
+          </p>
+          <div className="flex items-center gap-1" aria-hidden="true">
+            {AGENTS.map((agent) => (
+              <AgentAvatar key={agent.id} id={agent.id} size={24} state={working ? 'working' : 'waiting'} />
+            ))}
+          </div>
+        </div>
+      </header>
+
+      <div className="grid gap-6 px-8 pb-8 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+        <section className={`${cardClass} flex flex-col`} aria-labelledby="providers-title">
+          <div className="flex items-baseline justify-between gap-4 px-6 pt-6 pb-4">
+            <h2 id="providers-title" className="font-display text-[19px] font-semibold text-fg">
+              Провайдеры
+            </h2>
+            <span className="font-mono text-[12px] text-fg-dim">{providers === null ? '…' : `${providers.length} шт.`}</span>
+          </div>
+          <nav className="flex flex-col gap-1.5 px-4 pb-6" aria-label="Провайдеры">
+            {providers === null && <div className="h-32 animate-pulse rounded-[22px] border border-line bg-panel" />}
+            {providers?.map((p) => {
+              const active = p.id === selected
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => pick(p)}
+                  className={`press flex cursor-pointer items-center gap-3 rounded-[18px] border px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow] duration-150 ${
+                    active
+                      ? 'border-brand/70 bg-panel shadow-[0_0_0_1px_rgb(1_222_130/0.25),0_0_28px_rgb(1_222_130/0.08)]'
+                      : 'border-transparent hover:border-line-strong hover:bg-panel'
+                  }`}
+                >
+                  <ProviderMark name={p.name} size={32} active={active} />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[14px] font-semibold text-fg">{p.name}</span>
+                    <span className="truncate font-mono text-[11px] text-fg-dim">{p.default_model ?? 'модель не задана'}</span>
+                  </span>
+                  {p.builtin && <span className={`${tagClass} shrink-0`}>.env</span>}
+                </button>
+              )
+            })}
             <button
-              key={p.id}
               type="button"
-              onClick={() => pick(p)}
-              className={`press flex cursor-pointer flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-colors duration-150 ${
-                p.id === selected ? 'border-brand/70 bg-brand-deep/25' : 'border-line bg-surface hover:border-line-strong'
+              onClick={() => pick(null)}
+              className={`press mt-2 flex cursor-pointer items-center gap-3 rounded-[18px] border border-dashed px-3 py-2.5 text-left font-mono text-[12px] transition-colors duration-150 ${
+                selected === NEW ? 'border-brand text-brand' : 'border-line-input text-fg-dim hover:border-brand hover:text-brand'
               }`}
             >
-              <span className="flex w-full items-center justify-between gap-2">
-                <span className="truncate text-[14px] font-semibold text-fg">{p.name}</span>
-                {p.builtin && <span className="font-mono text-[10px] text-fg-dim">.env</span>}
+              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-current text-[14px]">
+                +
               </span>
-              <span className="w-full truncate font-mono text-[11px] text-fg-dim">{p.default_model ?? 'модель не задана'}</span>
+              провайдер
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => pick(null)}
-            className={`press cursor-pointer rounded-xl border border-dashed px-4 py-3 text-left font-mono text-[12px] transition-colors duration-150 ${
-              selected === NEW ? 'border-brand text-brand' : 'border-line-input text-fg-dim hover:border-brand hover:text-brand'
-            }`}
-          >
-            + провайдер
-          </button>
-        </nav>
+          </nav>
+        </section>
 
-        <form onSubmit={submit} className="flex max-w-[720px] flex-col gap-4 rounded-xl border border-line bg-surface p-6">
+        <form onSubmit={submit} className={`${cardClass} flex flex-col gap-5 p-6`} aria-labelledby="provider-title">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <ProviderMark name={current?.name ?? (form.name || '+')} size={48} active />
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <h2 id="provider-title" className="truncate font-display text-[19px] font-semibold text-fg">
+                {current?.name ?? 'Новый провайдер'}
+              </h2>
+              <span className="truncate font-mono text-[12px] text-fg-dim">{current ? current.base_url : 'любой OpenAI-совместимый API'}</span>
+            </div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {current?.builtin && <span className="rounded-full bg-brand-deep px-2.5 py-0.5 font-mono text-[11px] font-bold text-brand">по умолчанию</span>}
+              {current && !current.builtin && <span className={tagClass}>{current.has_key ? 'ключ сохранён' : 'без ключа'}</span>}
+              {jsonLabel && <span className={tagClass}>{jsonLabel}</span>}
+            </div>
+          </div>
+
           {readOnly && (
-            <p className="rounded-lg bg-panel px-3.5 py-2.5 text-[13px] text-fg-muted">
-              Провайдер по умолчанию — меняется в <span className="font-mono">backend/.env</span>.
+            <p className="m-0 rounded-[22px] border border-line bg-panel px-5 py-3.5 text-[13px] leading-[1.6] text-fg-muted">
+              Провайдер по умолчанию — меняется в <span className="font-mono text-fg-soft">backend/.env</span>.
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
@@ -219,12 +270,13 @@ export function ModelsPanel() {
           </div>
 
           {current && (
-            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-panel px-3.5 py-2.5" aria-live="polite">
+            <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-line bg-panel px-4 py-3" aria-live="polite">
+              <AgentAvatar id="analyst" size={32} state={check.state === 'busy' ? 'working' : check.state === 'ok' ? 'done' : 'waiting'} />
               <button
                 type="button"
                 onClick={() => runCheck(current.id)}
                 disabled={check.state === 'busy'}
-                className="press cursor-pointer rounded-full border border-line-input px-3.5 py-1.5 font-mono text-[12px] text-fg-soft hover:border-brand hover:text-brand disabled:cursor-wait disabled:opacity-60"
+                className="press inline-flex min-h-9 cursor-pointer items-center rounded-full border border-line-input px-4 font-display text-[13px] font-semibold text-fg hover:border-brand hover:text-brand disabled:cursor-wait disabled:opacity-60"
               >
                 {check.state === 'busy' ? 'проверяю…' : 'Проверить'}
               </button>
@@ -236,14 +288,16 @@ export function ModelsPanel() {
             </div>
           )}
 
-          {error && <p className="font-mono text-[12px] text-hazard">{error}</p>}
+          {error && (
+            <p className="m-0 rounded-2xl border border-hazard/60 bg-hazard-deep/40 px-4 py-3 font-mono text-[13px] text-hazard">{error}</p>
+          )}
 
           {!readOnly && (
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
               <button
                 type="submit"
                 disabled={saving}
-                className="press cursor-pointer rounded-full bg-brand px-5 py-2.5 font-display text-[13px] font-semibold text-ink hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
+                className="press inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-brand px-5 font-display text-[13px] font-semibold text-ink hover:bg-brand-hover disabled:cursor-wait disabled:opacity-60"
               >
                 {saving ? 'Сохраняю…' : current ? 'Сохранить' : 'Добавить'}
               </button>
@@ -251,7 +305,7 @@ export function ModelsPanel() {
                 <button
                   type="button"
                   onClick={() => set('api_key', '')}
-                  className="press cursor-pointer rounded-full border border-line-input px-4 py-2.5 text-[13px] text-fg-soft hover:border-amber hover:text-amber"
+                  className="press inline-flex min-h-11 cursor-pointer items-center rounded-full border border-line-input px-5 font-display text-[13px] font-semibold text-fg-soft hover:border-amber hover:text-amber"
                 >
                   {form.api_key === '' ? 'Ключ уберётся при сохранении' : 'Убрать ключ'}
                 </button>
@@ -260,7 +314,7 @@ export function ModelsPanel() {
                 <button
                   type="button"
                   onClick={remove}
-                  className="press ml-auto cursor-pointer rounded-full px-4 py-2.5 text-[13px] text-fg-dim hover:text-hazard"
+                  className="press ml-auto inline-flex min-h-11 cursor-pointer items-center rounded-full px-5 font-display text-[13px] font-semibold text-fg-dim hover:text-hazard"
                 >
                   Удалить
                 </button>
@@ -270,5 +324,25 @@ export function ModelsPanel() {
         </form>
       </div>
     </div>
+  )
+}
+
+interface ProviderMarkProps {
+  name: string
+  size: number
+  active: boolean
+}
+
+function ProviderMark({ name, size, active }: ProviderMarkProps) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
+      className={`grid shrink-0 place-items-center rounded-full border font-mono uppercase transition-colors duration-150 ${
+        active ? 'border-brand/70 bg-brand-deep/60 text-brand' : 'border-line-strong bg-ink text-fg-dim'
+      }`}
+    >
+      {initial(name)}
+    </span>
   )
 }
