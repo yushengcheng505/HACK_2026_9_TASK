@@ -1,0 +1,11 @@
+{
+  "repository": {"full_name": "team/synaps-epics"},
+  "push": {
+    "changes": [
+      {
+        "new": {"type": "branch", "name": "main", "target": {"hash": "aaa111"}},
+        "old": {"type": "branch", "name": "main", "target": {"hash": "bbb222"}}
+      }
+    ]
+  }
+}

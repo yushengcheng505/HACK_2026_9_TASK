@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
     PRIMARY KEY (name, version)
 );
 """
-JSON_FIELDS = ("questions", "result", "prompt_versions")
+JSON_FIELDS = ("questions", "result", "prompt_versions", "publication")
 TERMINAL = ("done", "failed")
 
 
@@ -78,6 +78,8 @@ class Store:
             self.db.execute("ALTER TABLE runs ADD COLUMN provider_id TEXT")
         if "concurrency" not in columns:
             self.db.execute("ALTER TABLE runs ADD COLUMN concurrency INTEGER")
+        if "publication" not in columns:
+            self.db.execute("ALTER TABLE runs ADD COLUMN publication TEXT")
         self.lock = threading.Lock()
 
     def create_run(self, id: str, title: str, origin: str, demo_id: str | None, skip_questions: bool,

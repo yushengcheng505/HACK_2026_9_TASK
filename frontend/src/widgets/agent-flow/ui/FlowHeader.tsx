@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { STATUS_LABEL } from '@/entities/run'
 import type { RunView } from '@/entities/run'
 import { pauseRun, resumeRun } from '@/features/run-control'
+import { PublishButton } from '@/features/publish-tracker'
 import { exportUrl } from '@/shared/api'
 import { useElapsed } from '@/shared/lib/useElapsed'
 import { routeHref } from '@/shared/lib/useHashRoute'
@@ -128,6 +129,7 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
             {fmt}
           </a>
         ))}
+        <PublishButton key={view.runId} runId={view.runId} ready={ready} />
       </div>
     </header>
   )

@@ -9,12 +9,13 @@ from urllib.parse import quote, urlparse
 
 import aiosqlite
 import httpx
-from fastapi import Body, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field
 
+from app.bitbucket import BitbucketClient, epic_folders, parse_push, verify_signature
 from app.checks import compute_stats, run_checks
 from app.config import BACKEND_DIR, REPO_DIR, get_settings
 from app.demos import list_demos, load_demo
@@ -29,6 +30,7 @@ from app.runner import Runner
 from app.schemas import Decomposition, Source
 from app.sources import InputFile
 from app.store import TERMINAL, Store
+from app.tracker import Tracker, TrackerError, tracker_from_settings
 
 EXPORTS = {
     "json": ("application/json", to_json),
@@ -76,7 +78,8 @@ def prompt_info(name: str) -> dict:
             "default_version": default.version, "overridden": current.version != default.version}
 
 
-def create_app(llm: LLM | None = None) -> FastAPI:
+def create_app(llm: LLM | None = None, tracker: Tracker | None = None,
+               bitbucket: BitbucketClient | None = None) -> FastAPI:
     settings = get_settings()
 
     @asynccontextmanager
@@ -87,10 +90,16 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         async with aiosqlite.connect(settings.data_dir / "checkpoints.db") as conn:
             graph = build_graph(AsyncSqliteSaver(conn))
             app.state.store = store
+            app.state.tracker = tracker or tracker_from_settings(settings)
+            app.state.bitbucket = bitbucket or BitbucketClient(settings.bitbucket_api, settings.bitbucket_user,
+                                                               settings.bitbucket_token)
+            app.state.webhook_tasks = set()
             app.state.runner = Runner(store, graph, llm or OpenAICompatLLM(settings), settings.llm_concurrency)
             yield
-            for task in list(app.state.runner.tasks.values()):
+            tasks = list(app.state.webhook_tasks) + list(app.state.runner.tasks.values())
+            for task in tasks:
                 task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     app = FastAPI(title="Агент-декомпозитор", lifespan=lifespan)
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"],
@@ -146,6 +155,72 @@ def create_app(llm: LLM | None = None) -> FastAPI:
         return {"status": "ok", "model": runner().llm.model, "llm_host": urlparse(settings.llm_base_url).netloc,
                 "concurrency": settings.llm_concurrency,
                 "json_mode": settings.llm_json_mode}
+
+    @app.get("/api/tracker")
+    def tracker_info():
+        return {"configured": app.state.tracker is not None, "kind": "jira",
+                "url": settings.jira_url, "project": settings.jira_project}
+
+    async def publish_run(run_id: str) -> dict:
+        run = get_run_or_404(run_id)
+        if run["status"] != "done":
+            raise HTTPException(409, "Результат ещё не готов")
+        if app.state.tracker is None:
+            raise HTTPException(503, "Jira не настроена")
+        try:
+            known = {i["local_id"]: i["key"] for i in (run.get("publication") or {}).get("issues", [])}
+            publication = await app.state.tracker.publish(Decomposition.model_validate(run["result"]), known)
+        except TrackerError as exc:
+            raise HTTPException(502, str(exc)) from exc
+        data = publication.model_dump()
+        store().update_run(run_id, publication=data)
+        runner().publish(run_id, "published", {k: data[k] for k in ("epic_url", "created", "updated")})
+        return data
+
+    async def publish_when_done(run_id: str):
+        try:
+            if task := runner().tasks.get(run_id):
+                await task
+            if get_run_or_404(run_id)["status"] == "done" and app.state.tracker is not None:
+                await publish_run(run_id)
+        except HTTPException as exc:
+            runner().publish(run_id, "publish_failed", {"error": str(exc.detail)})
+        except Exception as exc:
+            runner().publish(run_id, "publish_failed", {"error": str(exc)})
+
+    @app.post("/api/webhooks/bitbucket", status_code=202)
+    async def bitbucket_webhook(request: Request):
+        body = await request.body()
+        if settings.bitbucket_webhook_secret and not verify_signature(
+            settings.bitbucket_webhook_secret, body, request.headers.get("X-Hub-Signature")
+        ):
+            raise HTTPException(401, "Неверная подпись Bitbucket")
+        if request.headers.get("X-Event-Key") != "repo:push":
+            return Response(content='{"runs": []}', media_type="application/json")
+        try:
+            payload = json.loads(body)
+        except ValueError as exc:
+            raise HTTPException(422, "Некорректный JSON Bitbucket") from exc
+        runs = []
+        try:
+            for repo, new, old in parse_push(payload):
+                paths = await app.state.bitbucket.changed_paths(repo, new, old)
+                for folder in epic_folders(paths):
+                    if (epic := await app.state.bitbucket.load_epic(repo, new, folder)) is None:
+                        continue
+                    title, text, files = epic
+                    started = start(title, text, files, skip=True, origin="webhook", demo_id=None)
+                    runs.append({**started, "folder": folder})
+                    task = asyncio.create_task(publish_when_done(started["run_id"]))
+                    app.state.webhook_tasks.add(task)
+                    task.add_done_callback(app.state.webhook_tasks.discard)
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, "Не удалось получить файлы из Bitbucket") from exc
+        return {"runs": runs}
+
+    @app.post("/api/runs/{run_id}/publish")
+    async def publish(run_id: str):
+        return await publish_run(run_id)
 
     @app.get("/api/demos")
     def demos():

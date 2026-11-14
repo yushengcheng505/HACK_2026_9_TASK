@@ -16,4 +16,12 @@ os.environ.update({
     "LLM_CONCURRENCY": "1",
     "CRITIC_ROUNDS": "2",
     "DATA_DIR": DATA_DIR,
+    "JIRA_URL": "",
+    "JIRA_EMAIL": "",
+    "JIRA_API_TOKEN": "",
+    "JIRA_PROJECT": "",
+    "BITBUCKET_API": "",
+    "BITBUCKET_USER": "",
+    "BITBUCKET_TOKEN": "",
+    "BITBUCKET_WEBHOOK_SECRET": "",
 })

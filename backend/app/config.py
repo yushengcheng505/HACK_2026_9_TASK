@@ -40,6 +40,14 @@ class Settings:
     review_skeptic: bool
     review_simplifier: bool
     architect: bool
+    jira_url: str = ""
+    jira_email: str = ""
+    jira_token: str = ""
+    jira_project: str = ""
+    bitbucket_api: str = "https://api.bitbucket.org/2.0"
+    bitbucket_user: str = ""
+    bitbucket_token: str = ""
+    bitbucket_webhook_secret: str = ""
 
 
 def _flag(value: str) -> bool:
@@ -71,4 +79,12 @@ def get_settings() -> Settings:
         review_skeptic=_flag(env("REVIEW_SKEPTIC", "true")),
         review_simplifier=_flag(env("REVIEW_SIMPLIFIER", "true")),
         architect=_flag(env("ARCHITECT", "true")),
+        jira_url=env("JIRA_URL", ""),
+        jira_email=env("JIRA_EMAIL", ""),
+        jira_token=env("JIRA_API_TOKEN", ""),
+        jira_project=env("JIRA_PROJECT", ""),
+        bitbucket_api=env("BITBUCKET_API", "") or "https://api.bitbucket.org/2.0",
+        bitbucket_user=env("BITBUCKET_USER", ""),
+        bitbucket_token=env("BITBUCKET_TOKEN", ""),
+        bitbucket_webhook_secret=env("BITBUCKET_WEBHOOK_SECRET", ""),
     )

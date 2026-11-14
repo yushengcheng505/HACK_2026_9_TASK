@@ -23,12 +23,17 @@ def list_demos(root: Path | None = None) -> list[Demo]:
     return [load_demo(p.name, root) for p in sorted(root.iterdir()) if (p / "demo.json").is_file()]
 
 
+def split_title(md: str) -> tuple[str | None, str]:
+    heading = re.match(r"\A\s*#\s+([^\n]*)\n", md)
+    return (heading.group(1).strip(), md[heading.end():].strip()) if heading else (None, md.strip())
+
+
 def load_demo(demo_id: str, root: Path | None = None) -> Demo:
     root = root or get_settings().demo_dir
     base = root / demo_id
     meta = json.loads((base / "demo.json").read_text(encoding="utf-8"))
     epic = (base / "epic.md").read_text(encoding="utf-8")
-    epic = re.sub(r"\A\s*#\s+[^\n]*\n", "", epic).strip()
+    _, epic = split_title(epic)
     files = [
         InputFile(name=Path(rel).name, role=role, content=(base / rel).read_bytes())
         for role, paths in meta.get("files", {}).items()

@@ -10,6 +10,7 @@ from openpyxl import load_workbook
 
 from app.main import create_app
 from tests.fake_llm import FakeLLM
+from tests.fake_tracker import FakeTracker
 
 
 @pytest.fixture
@@ -246,3 +247,69 @@ def test_rejects_pdf_and_empty_epic(client):
     pdf = [("product_docs", ("spec.pdf", b"%PDF"))]
     assert client.post("/api/runs", data={"title": "x", "text": "y"}, files=pdf).status_code == 422
     assert client.post("/api/runs", data={"title": "x", "text": "  "}).status_code == 422
+
+
+def test_publish_without_tracker(client):
+    assert client.get("/api/tracker").json() == {
+        "configured": False, "kind": "jira", "url": "", "project": "",
+    }
+    assert client.post("/api/runs/missing/publish").status_code == 404
+    run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+    assert wait_status(client, run_id, ("done", "failed"))["status"] == "done"
+    response = client.post(f"/api/runs/{run_id}/publish")
+    assert response.status_code == 503 and response.json()["detail"] == "Jira не настроена"
+
+
+def test_publish_requires_finished_run():
+    tracker = FakeTracker()
+    with TestClient(create_app(llm=FakeLLM(), tracker=tracker)) as client:
+        run_id = client.post("/api/demos/boutique-delivery/run", json={}).json()["run_id"]
+        wait_status(client, run_id, ("waiting_answers",))
+        response = client.post(f"/api/runs/{run_id}/publish")
+        assert response.status_code == 409 and response.json()["detail"] == "Результат ещё не готов"
+        assert tracker.calls == 0
+
+
+def test_publish_saves_publication_and_event():
+    tracker = FakeTracker()
+    with TestClient(create_app(llm=FakeLLM(), tracker=tracker)) as client:
+        assert client.get("/api/tracker").json()["configured"] is True
+        run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+        assert wait_status(client, run_id, ("done", "failed"))["status"] == "done"
+        response = client.post(f"/api/runs/{run_id}/publish")
+        assert response.status_code == 200
+        assert response.json()["epic_key"] == "KAN-1" and tracker.calls == 1
+        assert client.get(f"/api/runs/{run_id}").json()["publication"] == response.json()
+        published = [data for kind, data in read_sse(client, f"/api/runs/{run_id}/events") if kind == "published"]
+        assert published == [{"epic_url": "https://jira.test/browse/KAN-1", "created": 1, "updated": 0}]
+        assert tracker.known == {}
+        client.post(f"/api/runs/{run_id}/publish")
+        assert tracker.known == {"EPIC": "KAN-1"}
+
+
+def test_publish_tracker_error_is_bad_gateway():
+    from app.tracker import TrackerError
+
+    class BrokenTracker(FakeTracker):
+        async def publish(self, d, known=None):
+            raise TrackerError("Jira 401: bad token")
+
+    with TestClient(create_app(llm=FakeLLM(), tracker=BrokenTracker())) as client:
+        run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+        assert wait_status(client, run_id, ("done", "failed"))["status"] == "done"
+        response = client.post(f"/api/runs/{run_id}/publish")
+        assert response.status_code == 502 and response.json()["detail"] == "Jira 401: bad token"
+        assert client.get(f"/api/runs/{run_id}").json().get("publication") is None
+
+
+def test_tracker_metadata_does_not_expose_credentials(monkeypatch):
+    from dataclasses import replace
+    from app.config import get_settings
+
+    settings = replace(get_settings(), jira_url="https://jira.test", jira_project="KAN",
+                       jira_email="private@example.test", jira_token="private-token")
+    monkeypatch.setattr("app.main.get_settings", lambda: settings)
+    with TestClient(create_app(llm=FakeLLM())) as client:
+        response = client.get("/api/tracker")
+        assert response.json() == {"configured": True, "kind": "jira", "url": "https://jira.test", "project": "KAN"}
+        assert "private" not in response.text
