@@ -103,7 +103,7 @@ class OpenAICompatLLM:
     async def complete_json(self, prompt_name: str, user: str, schema: type[T], on_token: OnToken | None = None,
                             on_retry: OnRetry | None = None) -> T:
         messages = [
-            {"role": "system", "content": load_prompt(prompt_name).text + schema_instruction(schema)},
+            {"role": "system", "content": load_prompt(prompt_name, self.settings.prompts_dir).text + schema_instruction(schema)},
             {"role": "user", "content": user},
         ]
         last_error = ""

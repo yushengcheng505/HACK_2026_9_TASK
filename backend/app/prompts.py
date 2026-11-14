@@ -1,5 +1,6 @@
 import hashlib
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.config import get_settings
 
@@ -11,8 +12,8 @@ class Prompt:
     version: str
 
 
-def load_prompt(name: str) -> Prompt:
-    text = (get_settings().prompts_dir / f"{name}.md").read_text(encoding="utf-8")
+def load_prompt(name: str, prompts_dir: Path | None = None) -> Prompt:
+    text = ((prompts_dir or get_settings().prompts_dir) / f"{name}.md").read_text(encoding="utf-8")
     return Prompt(name=name, text=text, version=hashlib.sha256(text.encode()).hexdigest()[:10])
 
 

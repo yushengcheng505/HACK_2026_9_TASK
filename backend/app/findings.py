@@ -1,5 +1,6 @@
 """Находки проверки: фильтр доказательств, сортировка, вердикты, план применения. Без LLM."""
 
+import json
 import re
 from dataclasses import dataclass
 
@@ -54,18 +55,24 @@ class ReviewContext:
             return {r.id: r.text for r in self.requirements}
         if where == "source":
             return {s.id: f"{s.title}\n{s.text}" for s in self.sources}
-        if where == "task":
-            return {t.id: task_text(t) for s in self.stories for t in s.tasks}
+        if where == "task":  # проверяющие видят задачи как JSON и цитируют в том числе его поля
+            return {t.id: f"{task_text(t)}\n{json.dumps(t.model_dump(), ensure_ascii=False)}"
+                    for s in self.stories for t in s.tasks}
         return {"": self.decisions}
 
 
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", "", normalize(text))
+
+
 def quote_found(ctx: ReviewContext, evidence: Evidence) -> bool:
-    quote = normalize(evidence.quote)
-    if len(quote) < MIN_QUOTE:
+    """Цитата есть в тексте; пробелы и переносы не важны — JSON задач приходит с отступами."""
+    if len(normalize(evidence.quote)) < MIN_QUOTE:
         return False
+    quote = _squash(evidence.quote)
     texts = ctx.texts(evidence.where)
     pool = [texts[evidence.ref]] if evidence.ref in texts else list(texts.values())
-    return any(quote in normalize(text) for text in pool)
+    return any(quote in _squash(text) for text in pool)
 
 
 def sole_cover(ctx: ReviewContext, task_id: str, excluded: frozenset[str] | set[str] = frozenset()) -> list[str]:

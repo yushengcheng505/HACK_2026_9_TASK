@@ -56,6 +56,13 @@ def test_quote_with_yo_and_quotes_matches():
     assert f.verdict == "pending"
 
 
+def test_quote_from_task_json_with_indents_matches():
+    f = finding(kind="wrong_requirement", tasks=("TASK-004",),
+                evidence=(("task", "TASK-004", '"requirement_ids": [\n   "REQ-002",\n   "REQ-001"\n  ]'),))
+    filter_findings([f], CTX)
+    assert f.verdict == "pending"
+
+
 def test_invented_quote_is_rejected():
     f = finding(evidence=(("decision", "", "опрашивать статус раз в 5 секунд"),))
     filter_findings([f], CTX)

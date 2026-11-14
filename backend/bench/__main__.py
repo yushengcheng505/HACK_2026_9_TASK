@@ -1,7 +1,7 @@
 """Мини-бенчмарк проверяющих агентов.
 
   uv run python -m bench e2e    --out bench/results/<метка> [--repeats 2] [--parallel 4] [--variants a,b]
-  uv run python -m bench review --out bench/results/<метка> [--bases A,B] [--repeats 2] [--parallel 4]
+  uv run python -m bench review --out bench/results/<метка> [--bases A,B] [--repeats 2] [--parallel 4] [--extended]
   uv run python -m bench report --out bench/results/<метка>
 
 Модель и ключ — из обычных настроек (LLM_BASE_URL, LLM_MODEL, LLM_API_KEY_ENV…). Готовые прогоны
@@ -15,13 +15,11 @@ import json
 from pathlib import Path
 from statistics import mean
 
-from app.config import get_settings
 from app.demos import load_demo
 from app.graph import encode_files
-from app.llm import OpenAICompatLLM
 
 from bench.bases import base_state
-from bench.harness import VARIANTS, run_graph
+from bench.harness import PROVIDER_ERRORS, VARIANTS, run_graph, variant_llm
 from bench.mutations import mutate
 from bench.score import score_e2e, score_review
 
@@ -29,7 +27,7 @@ BASES = ["affbf77db561", "8ed2ce672494"]
 
 
 def _save(path: Path, data: dict) -> None:
-    if "RateLimitError" in (data["run"].get("error") or ""):
+    if any(e.__name__ in (data["run"].get("error") or "") for e in PROVIDER_ERRORS):
         print(f"! {path.stem}: провайдер перегружен, прогон не сохранён — повторите команду", flush=True)
         return
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -56,7 +54,7 @@ async def _jobs(jobs, parallel: int) -> None:
 
 
 async def e2e(out: Path, repeats: int, parallel: int, variants: list[str]) -> None:
-    llm = OpenAICompatLLM(get_settings())
+    llms = {v: variant_llm(v, out) for v in variants}
     demo = load_demo("boutique-delivery")
     payload = {"title": demo.title, "epic_text": demo.epic_text, "files": encode_files(demo.files),
                "skip_questions": True}
@@ -68,20 +66,21 @@ async def e2e(out: Path, repeats: int, parallel: int, variants: list[str]) -> No
                 continue
 
             async def job(v=v, path=path):
-                run = await run_graph(llm, VARIANTS[v], payload=copy.deepcopy(payload))
+                run = await run_graph(llms[v], VARIANTS[v], payload=copy.deepcopy(payload))
                 _save(path, {"kind": "e2e", "variant": v, "score": score_e2e(run), "run": run})
 
             jobs.append((path, job))
     await _jobs(jobs, parallel)
 
 
-async def review(out: Path, repeats: int, parallel: int, variants: list[str], bases: list[str]) -> None:
-    llm = OpenAICompatLLM(get_settings())
+async def review(out: Path, repeats: int, parallel: int, variants: list[str], bases: list[str],
+                 extended: bool = False) -> None:
+    llms = {v: variant_llm(v, out) for v in variants}
     jobs = []
     for base in bases:
         clean = base_state(base)
         mutated = copy.deepcopy(clean)
-        mutations = mutate(mutated, base)
+        mutations = mutate(mutated, base, extended)
         for state_name, state, muts in (("defects", mutated, mutations), ("control", clean, [])):
             for n in range(1, repeats + 1):
                 for v in variants:
@@ -90,8 +89,9 @@ async def review(out: Path, repeats: int, parallel: int, variants: list[str], ba
                         continue
 
                     async def job(v=v, path=path, state=state, muts=muts, base=base, state_name=state_name):
-                        run = await run_graph(llm, VARIANTS[v], base_state=copy.deepcopy(state))
+                        run = await run_graph(llms[v], VARIANTS[v], base_state=copy.deepcopy(state))
                         _save(path, {"kind": "review", "variant": v, "base": base, "state": state_name,
+                                     "extended": extended,
                                      "mutations": [{"id": m.id, "title": m.title, "story_id": m.story_id}
                                                    for m in muts],
                                      "score": score_review(run, muts, state), "run": run})
@@ -107,9 +107,10 @@ def _starts() -> dict:
     starts = {}
     for base in BASES:
         clean = base_state(base)
-        mutated = copy.deepcopy(clean)
-        starts[(base, "defects")] = (mutated, mutate(mutated, base))
-        starts[(base, "control")] = (clean, [])
+        for extended in (False, True):
+            mutated = copy.deepcopy(clean)
+            starts[(base, "defects", extended)] = (mutated, mutate(mutated, base, extended))
+            starts[(base, "control", extended)] = (clean, [])
     return starts
 
 
@@ -121,8 +122,9 @@ def _load(out: Path, kind: str, rescore: bool = True) -> list[dict]:
         run = data.pop("run", None)
         if kind == "e2e" and rescore and run is not None:
             data["score"] = score_e2e(run)
-        if starts and run is not None and (data["base"], data["state"]) in starts:
-            state, muts = starts[(data["base"], data["state"])]
+        key = (data.get("base"), data.get("state"), data.get("extended", False))
+        if starts and run is not None and key in starts:
+            state, muts = starts[key]
             data["score"] = score_review(run, muts, state)
         rows.append(data)
     return rows
@@ -138,6 +140,10 @@ def _rate(flags) -> str:
     return f"{sum(flags)}/{len(flags)}" if flags else "—"
 
 
+def _present(rows: list[dict]) -> list[str]:
+    return [v for v in VARIANTS if any(r["variant"] == v for r in rows)]
+
+
 def report(out: Path) -> str:
     lines = [f"# Мини-бенчмарк проверяющих агентов — `{out.name}`", ""]
     e2e_rows = _load(out, "e2e")
@@ -146,7 +152,7 @@ def report(out: Path) -> str:
                   "| вариант | прогонов | мин | вызовов | повторов | рассужд., тыс. симв. | вход, тыс. симв. | историй | задач | "
                   "пробелов | противоречие 15 мин сохранено | ошибок кода | кандидатов в дубли | нерешённых | не проверено |",
                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
-        for v in VARIANTS:
+        for v in _present(e2e_rows):
             rs = [r["score"] for r in e2e_rows if r["variant"] == v]
             if not rs:
                 continue
@@ -163,15 +169,16 @@ def report(out: Path) -> str:
     rev = _load(out, "review")
     if rev:
         defects = [r for r in rev if r["state"] == "defects"]
+        variants = _present(rev)
         mutation_ids = sorted({m["id"] for r in defects for m in r["mutations"]})
         titles = {m["id"]: m["title"] for r in defects for m in r["mutations"]}
         lines += ["## Этапы 3–4: специальные проблемы в круге проверки", "",
                   "Ячейка: найдено / исправлено (по всем основам и повторам). Для `review*` в скобках — "
                   "сколько раз дефект был поднят хоть одной ролью, даже если находку отсеяли.", "",
-                  "| дефект | " + " | ".join(VARIANTS) + " |", "|---|" + "---|" * len(VARIANTS)]
+                  "| дефект | " + " | ".join(variants) + " |", "|---|" + "---|" * len(variants)]
         for mid in mutation_ids:
             cells = []
-            for v in VARIANTS:
+            for v in variants:
                 ds = [r["score"]["defects"][mid] for r in defects if r["variant"] == v and mid in r["score"]["defects"]]
                 if not ds:
                     cells.append("—")
@@ -186,7 +193,7 @@ def report(out: Path) -> str:
                   "переделано историй | удалено кодом не по дефектам | задач до → после | Δ непокрытых требований | "
                   "Δ ошибок кода | находок / подтверждено |",
                   "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
-        for v in VARIANTS:
+        for v in variants:
             for state in ("defects", "control"):
                 rs = [r["score"] for r in rev if r["variant"] == v and r["state"] == state]
                 if not rs:
@@ -214,13 +221,14 @@ def main() -> None:
     parser.add_argument("--parallel", type=int, default=4)
     parser.add_argument("--variants", default=",".join(VARIANTS))
     parser.add_argument("--bases", default=",".join(BASES))
+    parser.add_argument("--extended", action="store_true", help="добавить дефекты M8–M9")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     variants = args.variants.split(",")
     if args.command == "e2e":
         asyncio.run(e2e(args.out, args.repeats, args.parallel, variants))
     elif args.command == "review":
-        asyncio.run(review(args.out, args.repeats, args.parallel, variants, args.bases.split(",")))
+        asyncio.run(review(args.out, args.repeats, args.parallel, variants, args.bases.split(","), args.extended))
     print(report(args.out))
 
 

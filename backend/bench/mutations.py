@@ -19,16 +19,30 @@ KAFKA_TASK = {
                            "Схема событий courier-calls зарегистрирована в Schema Registry"],
     "source_refs": [], "test_scenarios": [],
 }
+GATEWAY_TASK = {
+    "id": "TASK-903", "type": "backend",
+    "title": "Выделить слой CarrierGateway с реестром подключаемых провайдеров доставки",
+    "description": "Спроектировать интерфейс CarrierGateway, фабрику провайдеров по конфигурации и реестр плагинов, "
+                   "чтобы в будущем подключать другие курьерские службы без изменения кода. «Курьер-Экспресс» "
+                   "оформить как первый плагин; провайдер выбирается переменной окружения CARRIER_PROVIDER.",
+    "definition_of_done": ["Интерфейс CarrierGateway и реестр плагинов провайдеров реализованы",
+                           "Провайдер доставки выбирается переменной окружения CARRIER_PROVIDER"],
+    "source_refs": [], "test_scenarios": [],
+}
+PRECONDITION = re.compile(r"FAILED_PRECONDITION", re.I)
 
 # Куда внедрять дефекты в каждой основе (номера историй и задач из записанных результатов).
 TARGETS = {
     "affbf77db561": {"poll": ("US-006", "TASK-099"), "track": "US-004",
                      "dup": ("TASK-078", "US-007", "REQ-011"), "log": ("US-008", "REQ-012", "TASK-055", "REQ-011"),
-                     "rate": "US-001", "contract": "TASK-078", "add_assumption": True},
+                     "rate": "US-001", "contract": "TASK-078", "add_assumption": True,
+                     "gateway": ("US-002", "REQ-002"), "cancel": "US-007"},
     "8ed2ce672494": {"poll": ("US-005", "TASK-104"), "track": "US-004",
                      "dup": ("TASK-063", "US-006", "REQ-013"), "log": ("US-007", "REQ-015", "TASK-047", "REQ-013"),
-                     "rate": "US-001", "contract": "TASK-063", "add_assumption": False},
+                     "rate": "US-001", "contract": "TASK-063", "add_assumption": False,
+                     "gateway": ("US-002", "REQ-002"), "cancel": "US-006"},
 }
+EXTENDED = ("M8", "M9")  # дефекты второго этапа: включаются флагом extended
 
 
 @dataclass
@@ -102,8 +116,8 @@ def _strip_story(state: dict, story_id: str, pattern: re.Pattern) -> None:
     state["stories"] = [s.model_dump() for s in stories]
 
 
-def mutate(state: dict, base_id: str) -> list[Mutation]:
-    """Внедрить все дефекты в state (на месте). Возвращает описания дефектов с проверками."""
+def mutate(state: dict, base_id: str, extended: bool = False) -> list[Mutation]:
+    """Внедрить дефекты в state (на месте): M1–M7, с extended — ещё M8–M9. Возвращает описания с проверками."""
     tg = TARGETS[base_id]
     stories = _stories(state)
     poll_story, poll_task = tg["poll"]
@@ -132,13 +146,29 @@ def mutate(state: dict, base_id: str) -> list[Mutation]:
     contract.description += " Передавать в CreateShipmentRequest поле courier_priority=HIGH для срочных заказов."
     contract.definition_of_done.append("В запрос CreateShipment передаётся courier_priority")
 
+    gateway_story, gateway_req = tg["gateway"]
+    if extended:
+        _story(stories, gateway_story).tasks.append(Task.model_validate(GATEWAY_TASK | {"requirement_ids": [gateway_req]}))
+
     state["stories"] = [s.model_dump() for s in stories]
     _strip_story(state, tg["rate"], TIMEOUT)
     assert not TIMEOUT.search(story_text(_stories(state), tg["rate"])), "таймауты вычищены не полностью"
+    if extended:
+        _strip_story(state, tg["cancel"], PRECONDITION)
+        assert not PRECONDITION.search(story_text(_stories(state), tg["cancel"])), "FAILED_PRECONDITION не вычищен"
 
     copy_title = normalize(original.title)
     contract_story = _task(_stories(state), tg["contract"])[0].id
-    return [
+    extra = [
+        Mutation("M8", "переусложнение на будущее: реестр плагинов CarrierGateway", gateway_story,
+                 ["carriergateway", "плагин", "TASK-903"], ["unneeded_task", "platform_covers", "merge_tasks"],
+                 ["TASK-903"], lambda ss: not mentioned(tasks_text(ss, gateway_story), "carriergateway")),
+        Mutation("M9", "не обработан отказ: отмена без FAILED_PRECONDITION", tg["cancel"],
+                 ["failed_precondition", "передан курьеру"],
+                 ["failure_not_handled", "criterion_not_covered", "contract_mismatch"], [],
+                 lambda ss: bool(PRECONDITION.search(story_text(ss, tg["cancel"])))),
+    ] if extended else []
+    return extra + [
         Mutation("M1", "противоречие решению: опрос каждые 30 секунд", poll_story, ["30 секунд", "30 с "],
                  ["contradicts_decision"], [poll_task],
                  lambda ss: not mentioned(tasks_text(ss, poll_story), "30 секунд")),

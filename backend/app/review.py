@@ -353,7 +353,7 @@ async def resolution_check(state: dict, config: RunnableConfig) -> dict:
 
 async def judge_gaps(state: dict, config: RunnableConfig, gaps: list[GapDraft]
                      ) -> tuple[list[GapDraft], list[Finding], list[ReviewSkip]]:
-    """Пробелы аналитика: фильтр цитат и скептик. На истории влияют только подтверждённые."""
+    """Пробелы аналитика: фильтр цитат и скептик. На истории влияют подтверждённые и понижённые (они реальны)."""
     opts = review_options(config)
     ctx = ReviewContext([], requirements_of(state), sources_of(state), decisions_block(state))
     findings = gap_findings(gaps, ctx.sources, first_id=len(state.get("findings", [])) + 1)
@@ -365,7 +365,7 @@ async def judge_gaps(state: dict, config: RunnableConfig, gaps: list[GapDraft]
         emit("findings_judged", round=0, error=error,
              verdicts=[{"id": f.id, "verdict": f.verdict, "severity": f.severity, "reason": f.verdict_reason}
                        for f in pending])
-    kept = [g for g, f in zip(gaps, findings) if f.verdict == "confirmed"]
+    kept = [g for g, f in zip(gaps, findings) if f.verdict in ("confirmed", "downgraded")]
     return kept, findings, skipped
 
 

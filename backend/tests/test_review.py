@@ -163,6 +163,22 @@ async def test_generator_dispute_reaches_next_round_and_resolution_check_runs():
     assert high.resolution == "resolved"
 
 
+async def test_downgraded_gap_is_kept():
+    import json
+
+    llm = FakeLLM()
+
+    def skeptic(user):
+        ids = [f["id"] for f in json.loads(user.split("```json\n", 1)[1].split("\n```", 1)[0])]
+        return {"verdicts": [{"finding_id": i, "verdict": "downgraded", "severity": "medium", "reason": "мельче"}
+                             for i in ids]}
+
+    llm.replies["skeptic"] = skeptic
+    _, result = await run_demo(llm, "r-gap-down")
+    gap = next(f for f in result.findings if f.source == "analyst")
+    assert gap.verdict == "downgraded" and len(result.gaps) == 1
+
+
 async def test_gap_with_invented_quote_is_dropped_but_logged():
     llm = FakeLLM()
     base = llm.replies["analyst"]

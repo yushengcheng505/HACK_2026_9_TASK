@@ -24,7 +24,7 @@ def test_negated_mention_does_not_count_as_defect():
 
 async def test_rate_limit_is_waited_out_and_counted():
     import httpx
-    from openai import RateLimitError
+    from openai import InternalServerError, RateLimitError
 
     from app.schemas import CriticOut
     from bench.harness import MeteredLLM
@@ -34,9 +34,12 @@ async def test_rate_limit_is_waited_out_and_counted():
 
         async def complete_json(self, prompt_name, user, schema, on_token=None, on_retry=None):
             self.attempts += 1
-            if self.attempts < 3:
+            request = httpx.Request("POST", "http://llm.test")
+            if self.attempts == 1:
                 raise RateLimitError("admission capacity is saturated", body=None,
-                                     response=httpx.Response(429, request=httpx.Request("POST", "http://llm.test")))
+                                     response=httpx.Response(429, request=request))
+            if self.attempts == 2:
+                raise InternalServerError("Error code: 502", body=None, response=httpx.Response(502, request=request))
             return CriticOut()
 
     llm = MeteredLLM(Saturated(), backoff=0)
@@ -69,3 +72,24 @@ async def test_review_only_run_scores_defect_from_start_state():
     assert run["error"] is None
     assert score["defects"]["M0"] == {"raised": False, "detected": False, "fixed": True, "verdicts": []}
     assert score["tasks_before"] == 4 and "reviewer" in score["calls_by_role"]
+
+
+def test_variant_llm_applies_token_limit_and_prompt_additions(tmp_path):
+    from app.config import get_settings
+    from app.prompts import load_prompt
+    from bench.harness import BRIEF, variant_llm
+
+    brief = variant_llm("review-brief-32k", tmp_path)
+    assert brief.settings.llm_max_tokens == 32768
+    assert load_prompt("reviewer", brief.settings.prompts_dir).text.rstrip().endswith(BRIEF.strip().splitlines()[-1])
+    assert load_prompt("tasks", brief.settings.prompts_dir).text == load_prompt("tasks").text
+    assert variant_llm("review", tmp_path).settings.prompts_dir == get_settings().prompts_dir
+
+
+def test_prompt_edits_apply_to_current_prompts():
+    from app.config import get_settings
+    from bench.harness import EXAMPLES, FAILURES, SEVERITY, SKEPTIC_GAPS, _merge, edit_prompt
+
+    for role, edits in _merge(SEVERITY, FAILURES, SKEPTIC_GAPS, EXAMPLES).items():
+        text = (get_settings().prompts_dir / f"{role}.md").read_text(encoding="utf-8")
+        assert edit_prompt(text, edits) != text
