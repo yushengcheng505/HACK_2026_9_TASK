@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react'
 export type RunMode = 'agents' | 'pult'
 
 /** Разделы консоли без параметров. */
-export type ConsoleSection = 'launch' | 'runs' | 'models' | 'prompts' | 'bench'
+export type ConsoleSection = 'launch' | 'runs' | 'models' | 'prompts' | 'bench' | 'lab'
 
 export type ConsoleRoute = { name: ConsoleSection } | { name: 'run'; id: string; mode?: RunMode }
 
-const SECTIONS: ConsoleSection[] = ['runs', 'models', 'prompts', 'bench']
+const SECTIONS: ConsoleSection[] = ['runs', 'models', 'prompts', 'bench', 'lab']
 
 function parse(hash: string): ConsoleRoute {
   const path = hash.replace(/^#/, '')

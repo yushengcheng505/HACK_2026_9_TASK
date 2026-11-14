@@ -1,6 +1,7 @@
 import { BenchPanel } from '@/widgets/bench-panel'
 import { ConsoleShell } from '@/widgets/console-shell'
 import { LaunchPanel } from '@/widgets/launch-panel'
+import { LabPanel } from '@/widgets/lab-panel'
 import { ModelsPanel } from '@/widgets/models-panel'
 import { PromptsPanel } from '@/widgets/prompts-panel'
 import { RunsList } from '@/widgets/runs-list'
@@ -17,6 +18,7 @@ export function ConsolePage() {
       {route.name === 'models' && <ModelsPanel />}
       {route.name === 'prompts' && <PromptsPanel />}
       {route.name === 'bench' && <BenchPanel />}
+      {route.name === 'lab' && <LabPanel />}
       {route.name === 'run' && <RunWorkspace key={route.id} runId={route.id} mode={agents ? 'agents' : 'pult'} />}
     </ConsoleShell>
   )

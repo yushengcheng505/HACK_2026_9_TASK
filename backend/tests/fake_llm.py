@@ -87,7 +87,9 @@ def default_replies():
 
     return {"architect": architect, "requirements": requirements, "analyst": analyst, "stories": stories, "tasks": tasks, "critic": critic,
             "reviewer": reviewer, "junction": lambda user: {"findings": []},
-            "simplifier": lambda user: {"findings": []}, "skeptic": skeptic}
+            "simplifier": lambda user: {"findings": []}, "skeptic": skeptic,
+            "lab": lambda user: {"matches": [{"analyst_id": "A-01",
+                                              "task_id": re.search(r"TASK-\d+", user).group(0)}]}}
 
 
 class FakeLLM:

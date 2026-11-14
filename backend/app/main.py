@@ -21,6 +21,7 @@ from app.config import BACKEND_DIR, REPO_DIR, get_settings
 from app.demos import list_demos, load_demo
 from app.exporters import to_docx, to_json, to_xlsx
 from app.graph import build_graph, encode_files
+from app.lab import compare, parse_analyst_list, parse_analyst_xlsx
 from app.limiter import MAX_CONCURRENCY, MIN_CONCURRENCY
 from app.llm import LLM, OpenAICompatLLM
 from app.prompts import default_prompt, load_prompt, prompt_names, reset_override, save_override
@@ -226,6 +227,33 @@ def create_app(llm: LLM | None = None, tracker: Tracker | None = None,
     def demos():
         return [{"id": d.id, "title": d.title, "summary": d.summary, "epic_text": d.epic_text,
                  "files": [{"name": f.name, "role": f.role} for f in d.files]} for d in list_demos()]
+
+    @app.get("/api/demos/{demo_id}/reference")
+    def demo_reference(demo_id: str):
+        if demo_id not in {d.id for d in list_demos()}:
+            raise HTTPException(404, "Эталон демо не найден")
+        path = settings.demo_dir / demo_id / "reference.md"
+        if not path.is_file():
+            raise HTTPException(404, "Эталон демо не найден")
+        return {"text": path.read_text(encoding="utf-8")}
+
+    @app.post("/api/runs/{run_id}/lab")
+    async def lab(run_id: str, text: str | None = Form(None), file: UploadFile | None = File(None)):
+        run = get_run_or_404(run_id)
+        if run["status"] != "done":
+            raise HTTPException(409, "Результат ещё не готов")
+        if file is not None:
+            data = await file.read()
+            try:
+                items = (parse_analyst_xlsx(data) if (file.filename or "").lower().endswith(".xlsx")
+                         else parse_analyst_list(data.decode("utf-8-sig")))
+            except Exception as exc:
+                raise HTTPException(422, "Не удалось прочитать список аналитика: нужен UTF-8 текст или XLSX") from exc
+        else:
+            items = parse_analyst_list(text or "")
+        if not items:
+            raise HTTPException(422, "Список аналитика пуст")
+        return await compare(run_llm(run), Decomposition.model_validate(run["result"]), items)
 
     @app.post("/api/demos/{demo_id}/run")
     async def run_demo(demo_id: str, body: DemoRunRequest = Body(default=DemoRunRequest())):
