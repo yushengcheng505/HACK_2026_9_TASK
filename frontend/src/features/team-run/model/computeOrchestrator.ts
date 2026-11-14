@@ -1,7 +1,7 @@
 import { ROSTER, type AgentTeam } from '@/entities/agent'
 import { clamp } from '@/shared/lib/math'
 import { plural } from '@/shared/lib/plural'
-import { agentTiming, RUN_TIMELINE, TYPING_SPEED } from './timeline'
+import { AGENT_TIMING, RUN_TIMELINE, TYPING_SPEED } from './timeline'
 import type { LogLine, OrchestratorMood, OrchestratorState } from './types'
 
 const VISIBLE_LOG_LINES = 4
@@ -11,29 +11,29 @@ interface LogEntry {
   text: string
 }
 
-const { waveStart } = RUN_TIMELINE
-
 const teamSize = (team: AgentTeam) => ROSTER.filter((agent) => agent.team === team).length
 const STAGES = teamSize('decomposition')
 const CHECKS = teamSize('review')
+const FIRST = ROSTER[0]
+const LAST = ROSTER[ROSTER.length - 1]
 
 const LOG: readonly LogEntry[] = [
   { at: 0.2, text: 'эпик получен' },
   { at: 1.1, text: `план: ${STAGES} ${plural(STAGES, 'этап', 'этапа', 'этапов')} и ${CHECKS} ${plural(CHECKS, 'проверка', 'проверки', 'проверок')}` },
-  { at: waveStart.decomposition + 0.1, text: 'раздаю декомпозицию' },
-  { at: waveStart.review + 0.1, text: 'отдаю на проверку' },
+  { at: RUN_TIMELINE.start + 0.1, text: `эпик → ${FIRST.name}` },
   ...ROSTER.map((agent, index) => ({
-    at: agentTiming(index).deliveredAt,
+    at: AGENT_TIMING[agent.id].doneAt,
     text: `${agent.name}: готово · ${index + 1}/${ROSTER.length}`,
   })),
-  { at: RUN_TIMELINE.assemblyStart, text: 'собираю итог' },
+  { at: RUN_TIMELINE.assemblyStart, text: `итог: ${LAST.name} → NAPS` },
+  { at: RUN_TIMELINE.assemblyStart + 0.7, text: 'собираю итог' },
   { at: RUN_TIMELINE.complete, text: 'задачи готовы' },
 ].sort((a, b) => a.at - b.at)
 
 function statusWordFor(mood: OrchestratorMood, time: number) {
   if (mood === 'done') return 'готово'
   if (mood === 'typing') return 'печатает'
-  return time >= waveStart.decomposition ? 'ждёт агентов' : 'думает'
+  return time >= RUN_TIMELINE.start ? 'ждёт итог' : 'думает'
 }
 
 export function computeOrchestrator(time: number): OrchestratorState {

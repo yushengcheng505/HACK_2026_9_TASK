@@ -20,7 +20,7 @@ export function Orchestrator({ state, time }: OrchestratorProps) {
       <Keyboard pressedKey={hands.pressedKey} />
       <TypingHands hands={hands} />
       <text x="200" y="334" className="scene-label scene-label--big">
-        NAPS <tspan className="scene-role-inline">· ОРКЕСТРАТОР</tspan>
+        NAPS
       </text>
     </g>
   )

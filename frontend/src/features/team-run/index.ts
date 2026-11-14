@@ -1,6 +1,7 @@
 export { computeRunFrame } from './model/computeRunFrame'
 export { PHASE_LABELS } from './model/scenario'
-export { RUN_TIMELINE } from './model/timeline'
+export { HOPS, RUN_TIMELINE } from './model/timeline'
+export type { Hop, HopEnd } from './model/timeline'
 export type {
   AgentRunState,
   AgentStatus,

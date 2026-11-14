@@ -46,13 +46,6 @@
 .scene-label--agent {
   font-size: 13px;
 }
-.scene-role-inline {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 400;
-  fill: var(--color-fg-dim);
-  letter-spacing: 0.08em;
-}
 .scene-role {
   font-family: var(--font-mono);
   font-size: 10px;

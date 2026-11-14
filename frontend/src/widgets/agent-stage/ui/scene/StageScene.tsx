@@ -14,7 +14,7 @@ interface StageSceneProps {
 }
 
 export function StageScene({ frame }: StageSceneProps) {
-  const { trails, planes } = computeFlights(frame.agents, frame.time)
+  const { trails, planes } = computeFlights(frame.time)
 
   return (
     <div className="overflow-x-auto rounded-[20px]">
@@ -23,7 +23,7 @@ export function StageScene({ frame }: StageSceneProps) {
           viewBox={`0 0 ${SCENE_SIZE.width} ${SCENE_SIZE.height}`}
           className="absolute inset-0 block size-full"
           role="img"
-          aria-label="Оркестратор NAPS отправляет задачи пяти агентам декомпозиции, затем четырём проверяющим и собирает их ответы"
+          aria-label="NAPS передаёт эпик Составителю, пять агентов декомпозиции по цепочке передают работу друг другу, Генератор задач отдаёт её трём проверяющим, их находки сходятся у Скептика, а итог от Скептика возвращается к NAPS"
         >
           <TeamLabels />
           <RouteTrails trails={trails} />

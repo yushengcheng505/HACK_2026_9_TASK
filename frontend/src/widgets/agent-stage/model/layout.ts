@@ -1,4 +1,5 @@
 import { ROSTER, type AgentId, type AgentTeam } from '@/entities/agent'
+import { HOPS, type Hop } from '@/features/team-run'
 import type { Point, QuadCurve } from '@/shared/lib/math'
 
 /** Координаты в системе viewBox сцены 1200×600. */
@@ -58,50 +59,50 @@ export const AGENT_SLOTS = Object.fromEntries(
   ROSTER.map((agent) => [agent.id, { cx: COLUMNS[agent.team][columnOf(agent.id)], bodyY: TEAM_ROWS[agent.team].bodyY }]),
 ) as Record<AgentId, AgentSlot>
 
-export interface FlightRoute {
-  out: QuadCurve
-  back: QuadCurve
-}
-
 /** Габарит робота с подписью относительно центра корпуса: всё, через что самолётик лететь не должен. */
 export const AGENT_BOUNDS = { halfWidth: 78, top: 72, bottom: CAPTION.chipY + CAPTION.chipHeight } as const
 
 /** Подписи рядов стоят вертикально слева от роботов, чтобы коридор между рядами был свободен. */
 export const TEAM_LABEL_X = 466
 
-/** Где самолётики касаются NAPS: вылет к верхнему ряду, приём от него (справа от клавиатуры), вылет к нижнему, приём в консоль. */
+/** Где самолётики касаются NAPS: эпик вылетает к верхнему ряду, итог садится в консоль NAPS. */
 const NAPS_PORTS = {
-  toTop: [292, 150],
-  fromTop: [308, 270],
-  toBottom: [318, 300],
-  fromBottom: [362, 540],
+  epic: [292, 150],
+  result: [362, 540],
 } as const
 
-/**
- * У каждого самолётика своя дорожка, и ни одна не проходит через роботов:
- * верхний ряд получает задачи по дугам над собой и отдаёт ответы по верхней полосе коридора между рядами;
- * нижний получает по нижней полосе коридора (сверху, над головами соседей) и отдаёт под собой — в консоль NAPS.
- */
-function routeFor(id: AgentId): FlightRoute {
-  const { cx, bodyY } = AGENT_SLOTS[id]
-  const column = columnOf(id)
-  const team = ROSTER.find((a) => a.id === id)!.team
-  const top: Point = [cx, bodyY - AGENT_BOUNDS.top - 4]
-  const bottom: Point = [cx, bodyY + AGENT_BOUNDS.bottom + 6]
+const topOf = (id: AgentId): Point => [AGENT_SLOTS[id].cx, AGENT_SLOTS[id].bodyY - AGENT_BOUNDS.top - 4]
+const bottomOf = (id: AgentId): Point => [AGENT_SLOTS[id].cx, AGENT_SLOTS[id].bodyY + AGENT_BOUNDS.bottom + 6]
+const teamOf = (id: AgentId) => ROSTER.find((a) => a.id === id)!.team
 
-  if (team === 'decomposition') {
-    return {
-      out: { from: NAPS_PORTS.toTop, control: [(292 + cx) / 2, 30 - column * 26], to: top },
-      back: { from: bottom, control: [(cx + 300) / 2, 290 + column * 4], to: NAPS_PORTS.fromTop },
-    }
+/**
+ * Дорожки повторяют связи графа в консоли и не проходят через роботов:
+ * эпик летит от NAPS дугой над верхним рядом, декомпозиция передаёт работу соседу по дуге над головами,
+ * Генератор задач отдаёт её проверяющим через коридор между рядами, находки идут к Скептику под нижним рядом,
+ * а итог от Скептика — ещё ниже, в консоль NAPS.
+ */
+function routeFor({ from, to }: Hop): QuadCurve {
+  if (from === 'naps') {
+    const end = topOf(to as AgentId)
+    return { from: NAPS_PORTS.epic, control: [(NAPS_PORTS.epic[0] + end[0]) / 2, 30], to: end }
   }
-  return {
-    out: { from: NAPS_PORTS.toBottom, control: [cx - 90 - column * 10, 326 + column * 2], to: top },
-    back: { from: bottom, control: [(cx + 360) / 2, 594 + column * 4], to: NAPS_PORTS.fromBottom },
+  if (to === 'naps') {
+    const start = bottomOf(from)
+    return { from: start, control: [(start[0] + NAPS_PORTS.result[0]) / 2, 640], to: NAPS_PORTS.result }
   }
+  if (teamOf(from) !== teamOf(to)) {
+    const start = bottomOf(from)
+    const end = topOf(to)
+    return { from: start, control: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2 - 6], to: end }
+  }
+  if (teamOf(from) === 'decomposition') {
+    const start = topOf(from)
+    const end = topOf(to)
+    return { from: start, control: [(start[0] + end[0]) / 2, start[1] - 60], to: end }
+  }
+  const start = bottomOf(from)
+  const end = bottomOf(to)
+  return { from: start, control: [(start[0] + end[0]) / 2, start[1] + 20 + Math.abs(end[0] - start[0]) * 0.12], to: end }
 }
 
-export const FLIGHT_ROUTES = Object.fromEntries(ROSTER.map((agent) => [agent.id, routeFor(agent.id)])) as Record<
-  AgentId,
-  FlightRoute
->
+export const HOP_ROUTES: Record<string, QuadCurve> = Object.fromEntries(HOPS.map((hop) => [hop.key, routeFor(hop)]))
