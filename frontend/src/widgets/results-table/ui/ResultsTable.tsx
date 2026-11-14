@@ -60,32 +60,32 @@ export function ResultsTable({ view, onSaved, onSelect }: ResultsTableProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-3">
+      <div className="flex min-h-[52px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-2">
         <p className="text-[13px] text-fg-muted">
-          {editable
-            ? 'Правьте формулировки, типы, удаляйте лишнее. После сохранения проверки кодом пересчитаются без новой генерации.'
-            : 'Редактирование откроется, когда агент закончит.'}
+          {editable ? 'Текст и типы можно править — проверки пересчитаются без новой генерации.' : 'Править можно, когда прогон закончится.'}
         </p>
-        <div className="flex items-center gap-3">
-          {error && <span className="font-mono text-[12px] text-hazard">{error}</span>}
-          {dirty && <span className="tag text-amber">есть несохранённые правки</span>}
-          <button
-            type="button"
-            disabled={!dirty || busy}
-            onClick={() => setEdited(null)}
-            className="press tag cursor-pointer border border-line-input px-3 py-2 text-fg-soft hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            отменить
-          </button>
-          <button
-            type="button"
-            disabled={!dirty || busy}
-            onClick={save}
-            className="press inline-flex min-h-9 cursor-pointer items-center rounded-[2px] bg-brand px-4 font-display text-[13px] font-semibold text-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {busy ? 'Проверяю…' : 'Сохранить и перепроверить'}
-          </button>
-        </div>
+        {(dirty || error) && (
+          <div className="fx-fade flex items-center gap-3">
+            {error && <span className="font-mono text-[12px] text-hazard">{error}</span>}
+            {dirty && <span className="text-[12.5px] text-amber">есть правки</span>}
+            <button
+              type="button"
+              disabled={!dirty || busy}
+              onClick={() => setEdited(null)}
+              className="press cursor-pointer rounded-lg px-3 py-1.5 text-[13px] font-semibold text-fg-soft hover:bg-surface hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Отменить
+            </button>
+            <button
+              type="button"
+              disabled={!dirty || busy}
+              onClick={save}
+              className="press inline-flex min-h-8 cursor-pointer items-center rounded-lg bg-brand px-3.5 text-[13px] font-semibold text-ink hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {busy ? 'Проверяю…' : 'Сохранить и перепроверить'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
@@ -168,7 +168,15 @@ function StoryRows({ story, editable, onSelect, onStoryTitle, onTask }: StoryRow
           <td className={`${cell} font-mono text-[11px] ${t.requirement_ids.length ? 'text-fg-dim' : 'text-hazard'}`}>
             {t.requirement_ids.join(', ') || 'нет'}
           </td>
-          <td className={`${cell} max-w-[220px] font-mono text-[10.5px] leading-snug text-fg-dim`}>{t.source_refs.join(' · ')}</td>
+          <td className={`${cell} max-w-[260px]`}>
+            <span className="flex flex-wrap gap-1">
+              {t.source_refs.map((ref) => (
+                <span key={ref} className="max-w-full truncate rounded-[5px] bg-surface px-1.5 py-px font-mono text-[10.5px] text-fg-dim" title={ref}>
+                  {ref.replace(/^PROTO:/, '')}
+                </span>
+              ))}
+            </span>
+          </td>
           <td className={`${cell} text-right`}>
             {editable && (
               <button

@@ -1,19 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRunStream } from '@/features/run-stream'
-import { RunHeader } from '@/widgets/run-header'
-import { RunMetrics } from '@/widgets/run-metrics'
-import { PipelineRail } from '@/widgets/pipeline-rail'
-import { TraceMap } from '@/widgets/trace-map'
+import { RunProgress, stagesOf } from '@/widgets/run-progress'
+import type { StageId } from '@/widgets/run-progress'
+import { StoryFocus, TraceMap } from '@/widgets/trace-map'
 import { Inspector } from '@/widgets/inspector'
 import { Telemetry } from '@/widgets/telemetry'
 import { QuestionsPanel } from '@/widgets/questions-panel'
 import { ResultsTable } from '@/widgets/results-table'
 import { QcReport } from '@/widgets/qc-report'
 import { GapsBoard } from '@/widgets/gaps-board'
-import { AgentFlow } from '@/widgets/agent-flow'
+import { AgentFlow, FlowHeader } from '@/widgets/agent-flow'
 import type { RunMode } from '@/shared/lib/useHashRoute'
 
 type Tab = 'map' | 'table' | 'qc' | 'gaps'
+type MapView = 'lanes' | 'columns'
+const MAP_VIEWS: { id: MapView; label: string }[] = [
+  { id: 'lanes', label: 'По историям' },
+  { id: 'columns', label: 'Колонки' },
+]
 
 interface RunWorkspaceProps {
   runId: string
@@ -25,22 +29,37 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
   const [tab, setTab] = useState<Tab>('map')
   const [selected, setSelected] = useState<string | null>(null)
   const [gapId, setGapId] = useState<string | null>(null)
+  const [stage, setStage] = useState<StageId | null>(null)
+  const [mapView, setMapView] = useState<MapView>('lanes')
+  const lanes = mapView === 'lanes'
 
   const select = useCallback((key: string | null) => {
     setSelected(key)
     setGapId(null)
+    setStage(null)
   }, [])
   const showGap = useCallback((id: string | null) => {
     setGapId(id)
     setSelected(null)
+    setStage(null)
     setTab('map')
   }, [])
+  const showStage = useCallback((id: StageId) => {
+    setStage((s) => (s === id ? null : id))
+    setSelected(null)
+    setGapId(null)
+  }, [])
+  const stagePanel = useMemo(() => {
+    const s = stage ? stagesOf(view).find((x) => x.id === stage) : null
+    return s ? { kicker: 'Этап прогона', title: s.label, rows: s.rows } : null
+  }, [stage, view])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelected(null)
         setGapId(null)
+        setStage(null)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -65,10 +84,9 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
   }
 
   return (
-    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_auto_minmax(0,1fr)_auto]">
-      <RunHeader view={view} replay={replay} speed={speed} onReplay={() => startReplay()} />
-      <RunMetrics view={view} />
-      <PipelineRail view={view} />
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto]">
+      <FlowHeader view={view} mode="pult" replay={replay} speed={speed} onReplay={startReplay} />
+      <RunProgress view={view} selected={stage} onSelect={showStage} />
 
       <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
         <div className="relative flex min-h-0 min-w-0 flex-col">
@@ -98,10 +116,26 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
                 сбой: {view.error}
               </span>
             )}
+            {tab === 'map' && (
+              <div className="af-seg ml-auto self-center" role="group" aria-label="Вид карты">
+                {MAP_VIEWS.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setMapView(v.id)}
+                    aria-pressed={mapView === v.id}
+                    className={`af-seg-item ${mapView === v.id ? 'af-seg-on' : ''}`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="relative min-h-0 flex-1">
-            {tab === 'map' && <TraceMap view={view} selected={selected} onSelect={select} gapId={gapId} />}
+          <div key={tab === 'map' ? `map-${lanes}` : tab} className="fx-fade relative min-h-0 flex-1">
+            {tab === 'map' && lanes && <StoryFocus view={view} selected={selected} onSelect={select} gapId={gapId} />}
+            {tab === 'map' && !lanes && <TraceMap view={view} selected={selected} onSelect={select} gapId={gapId} />}
             {tab === 'table' && <ResultsTable view={view} onSaved={refresh} onSelect={(k) => { select(k); setTab('map') }} />}
             {tab === 'qc' && <QcReport view={view} onSelect={(k) => { select(k); setTab('map') }} />}
             {tab === 'gaps' && <GapsBoard view={view} onShow={showGap} />}
@@ -109,7 +143,7 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
 
           {view.waitingAnswers && !replay && <QuestionsPanel runId={runId} questions={view.questions} />}
         </div>
-        <Inspector view={view} selected={selected} onSelect={select} onGap={showGap} />
+        <Inspector view={view} selected={selected} onSelect={select} onGap={showGap} stage={stagePanel} />
       </div>
 
       <Telemetry view={view} />

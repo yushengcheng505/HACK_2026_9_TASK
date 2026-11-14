@@ -5,24 +5,33 @@ import { useElapsed } from '@/shared/lib/useElapsed'
 import { routeHref } from '@/shared/lib/useHashRoute'
 import { BrandName } from '@/shared/ui/BrandName'
 import { LogoMark } from '@/shared/ui/LogoMark'
+import type { RunMode } from '@/shared/lib/useHashRoute'
+import '../flow.css'
 
 const SPEEDS = [4, 10, 25] as const
+const MODES: { mode: RunMode; label: string }[] = [
+  { mode: 'agents', label: 'Агенты' },
+  { mode: 'pult', label: 'Пульт' },
+]
 
 interface FlowHeaderProps {
   view: RunView
+  /** Какой вид прогона сейчас открыт: граф агентов или пульт. */
+  mode: RunMode
   replay: boolean
   speed: number
   onReplay: (speed: number) => void
 }
 
-export function FlowHeader({ view, replay, speed, onReplay }: FlowHeaderProps) {
+/** Шапка прогона, общая для графа агентов и пульта. */
+export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderProps) {
   const elapsed = useElapsed(view.startedAt, view.finishedAt)
   const status = STATUS_LABEL[view.status]
   const ready = view.status === 'done'
   const canReplay = view.status !== 'running' || replay
 
   return (
-    <header className="af-header col-span-2 flex items-center gap-6 px-5">
+    <header className="af-header flex items-center gap-6 px-5">
       <a href={routeHref({ name: 'runs' })} className="press flex shrink-0 items-center gap-2.5" title="К журналу запусков">
         <LogoMark mood={ready ? 'happy' : 'calm'} />
         <BrandName className="text-[15px]" />
@@ -38,12 +47,17 @@ export function FlowHeader({ view, replay, speed, onReplay }: FlowHeaderProps) {
       </div>
 
       <nav className="af-seg" aria-label="Вид прогона">
-        <span className="af-seg-item af-seg-on" aria-current="page">
-          Агенты
-        </span>
-        <a className="af-seg-item" href={routeHref({ name: 'run', id: view.runId, mode: 'pult' })}>
-          Пульт
-        </a>
+        {MODES.map((m) =>
+          m.mode === mode ? (
+            <span key={m.mode} className="af-seg-item af-seg-on" aria-current="page">
+              {m.label}
+            </span>
+          ) : (
+            <a key={m.mode} className="af-seg-item" href={routeHref({ name: 'run', id: view.runId, mode: m.mode })}>
+              {m.label}
+            </a>
+          ),
+        )}
       </nav>
 
       <div className={`flex shrink-0 items-center gap-2 ${status.cls}`}>

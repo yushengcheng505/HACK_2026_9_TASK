@@ -7,7 +7,7 @@ import { routeHref } from '@/shared/lib/useHashRoute'
 
 interface ConsoleShellProps {
   route: ConsoleRoute
-  /** Без боковой панели — экран целиком отдан графу агентов. */
+  /** Без боковой панели — экран целиком отдан прогону (граф агентов или пульт). */
   bare?: boolean
   children: ReactNode
 }

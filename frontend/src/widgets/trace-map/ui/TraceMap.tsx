@@ -75,9 +75,12 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
     }
   }, [measure])
 
+  const [hover, setHover] = useState<string | null>(null)
   const groups = useMemo(() => sourceGroups(view), [view])
   const edges = useMemo(() => traceEdges(view), [view])
   const trace = useMemo(() => (selected ? traceOf(view, selected) : null), [view, selected])
+  // Наведение без выбора — лёгкий предпросмотр цепочки: связи и рамки подсвечены, остальное не гаснет.
+  const preview = useMemo(() => (!selected && hover ? traceOf(view, hover) : null), [view, selected, hover])
 
   const gapSources = useMemo(() => {
     const gap = view.gaps.find((g) => g.id === gapId)
@@ -127,15 +130,19 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
         data-trace-key={key}
         type="button"
         onClick={() => toggle(key)}
+        onPointerEnter={() => setHover(key)}
+        onPointerLeave={() => setHover((h) => (h === key ? null : h))}
         style={stagger(i)}
-        className={`fx-enter group relative z-[1] flex w-full cursor-pointer flex-col gap-1 border bg-surface px-3 py-2 text-left transition-[border-color,background-color] duration-200 [&>*]:transition-opacity [&>*]:duration-200 ${
+        className={`fx-enter group relative z-[1] flex w-full cursor-pointer flex-col gap-1 overflow-hidden rounded-[10px] border bg-surface px-3 py-2 text-left break-words transition-[border-color,background-color] duration-200 [&>*]:transition-opacity [&>*]:duration-200 ${
           active
             ? 'border-brand bg-panel glow-brand'
             : gapSources.has(key)
               ? 'border-hazard bg-hazard-deep/30'
               : lit
                 ? 'border-brand/60 bg-panel'
-                : 'border-line hover:border-line-input hover:bg-panel'
+                : preview?.has(key)
+                  ? 'border-brand/40 bg-panel'
+                  : 'border-line hover:border-line-input hover:bg-panel'
         } ${dimmed(key) ? '[&>*]:opacity-25' : ''} ${extra}`}
       >
         {body}
@@ -155,7 +162,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
           <span className="truncate font-mono text-[10.5px] text-fg-dim">{short ? short.scope : s.id}</span>
           <span className="flex shrink-0 items-center gap-1">
             {gaps?.map((g) => (
-              <span key={g} className="bg-hazard px-1 font-mono text-[9.5px] font-bold text-ink">
+              <span key={g} className="rounded-[4px] bg-hazard px-1 font-mono text-[9.5px] font-bold text-ink">
                 {g}
               </span>
             ))}
@@ -175,13 +182,17 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
 
   return (
     <div className="h-full overflow-auto" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
-      <div ref={content} className="relative grid min-w-[1080px] grid-cols-[1fr_1.1fr_1.1fr_1.25fr] gap-x-14 px-6 pb-10">
+      <div
+        ref={content}
+        className="relative grid min-w-[1000px] grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_minmax(0,1.25fr)] gap-x-12 px-6 pb-10"
+      >
         <svg className="pointer-events-none absolute top-0 left-0 z-0 overflow-visible" width={geo.w} height={geo.h} aria-hidden="true">
           {edges.map((e) => {
             const a = geo.pos.get(e.from)
             const b = geo.pos.get(e.to)
             if (!a || !b) return null
-            const on = !!trace && trace.has(e.from) && trace.has(e.to)
+            const chain = trace ?? preview
+            const on = !!chain && chain.has(e.from) && chain.has(e.to)
             const d = edgePath(a, b)
             const len = Math.round(Math.abs(b.l - a.r) + Math.abs(b.y - a.y) + 40)
             return (
@@ -190,12 +201,16 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
                   d={d}
                   fill="none"
                   className={`fx-draw transition-[stroke,opacity] duration-200 ${
-                    on ? 'stroke-brand opacity-90' : trace || gapSources.size ? 'stroke-line-strong opacity-[0.12]' : 'stroke-line-input opacity-50'
+                    on
+                      ? 'stroke-brand opacity-90'
+                      : chain || gapSources.size
+                        ? 'stroke-line-strong opacity-[0.12]'
+                        : 'stroke-line-input opacity-35'
                   }`}
                   strokeWidth={on ? 1.5 : 1}
                   style={{ ['--len' as string]: len }}
                 />
-                {on && <path d={d} fill="none" className="fx-flow stroke-brand-hover" strokeWidth={2} />}
+                {on && trace && <path d={d} fill="none" className="fx-flow stroke-brand-hover" strokeWidth={2} />}
               </g>
             )
           })}
@@ -218,17 +233,15 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
 
         {(
           [
-            ['Источники', sourcesCount, 'фрагменты с ID'],
-            ['Требования', view.requirements.length, 'REQ'],
-            ['Истории', view.stories.length, 'US'],
-            ['Задачи', tasksCount, 'TASK'],
+            ['Источники', sourcesCount],
+            ['Требования', view.requirements.length],
+            ['Истории', view.stories.length],
+            ['Задачи', tasksCount],
           ] as const
-        ).map(([title, count, hint]) => (
-          <div key={title} className="sticky top-0 z-[3] -mx-2 mb-3 flex items-baseline justify-between bg-ink/95 px-2 pt-4 pb-2.5 backdrop-blur-[2px]">
-            <span className="tag text-fg-soft">[ {title} ]</span>
-            <span className="tag text-fg-dim">
-              {count} · {hint}
-            </span>
+        ).map(([title, count]) => (
+          <div key={title} className="sticky top-0 z-[3] -mx-2 mb-3 flex items-baseline gap-2 bg-ink/95 px-2 pt-4 pb-2.5 whitespace-nowrap backdrop-blur-[2px]">
+            <span className="text-[13px] font-semibold text-fg">{title}</span>
+            <span className="font-mono text-[11px] text-fg-dim">{count}</span>
           </div>
         ))}
 
@@ -238,7 +251,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
           {groups.map((g) => (
             <div key={g.title} className="flex flex-col gap-1.5">
               <span className="tag text-[10px] text-brand-mid">
-                {'//'} {g.title} · {g.items.length}
+                {g.title} · {g.items.length}
               </span>
               {g.items.map((s, i) => node(nodeKey('source', s.id), i, sourceBody(s), s.kind === 'proto_rpc' || s.kind === 'openapi_op' ? 'pl-4' : ''))}
             </div>
@@ -260,7 +273,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
                     <span className="tag text-[9.5px] text-fg-dim">{REQ_TYPE[r.type]}</span>
                   </span>
                 </span>
-                <span className="line-clamp-3 text-[12.5px] leading-snug text-fg-soft">{r.text}</span>
+                <span className="line-clamp-2 text-[12.5px] leading-snug text-fg-soft">{r.text}</span>
               </>,
               uncovered.has(r.id) ? 'border-l-hazard' : '',
             ),
@@ -278,11 +291,11 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
                 <span className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] font-bold text-brand">{s.id}</span>
                   <span className="flex items-center gap-1.5">
-                    {criticStories.has(s.id) && <span className="tag bg-amber-deep px-1 text-[9.5px] text-amber">критик</span>}
+                    {criticStories.has(s.id) && <span className="tag rounded-[4px] bg-amber-deep px-1 text-[9.5px] text-amber">доработка</span>}
                     <span className="tag text-[9.5px] text-fg-dim">{s.tasks.length} задач</span>
                   </span>
                 </span>
-                <span className="line-clamp-4 text-[12.5px] leading-snug text-fg">{s.title}</span>
+                <span className="line-clamp-3 text-[12.5px] leading-snug text-fg">{s.title}</span>
               </>,
             ),
           )}
@@ -297,7 +310,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
             return (
               <div key={s.id} className="flex flex-col gap-1.5">
                 <span className={`tag text-[10px] ${dimmed(nodeKey('story', s.id)) ? 'text-fg-dim/40' : 'text-brand-mid'}`}>
-                  {'//'} {s.id}
+                  {s.id}
                 </span>
                 {s.tasks.map((t, i) => {
                   const type = TASK_TYPE[t.type]
@@ -310,7 +323,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
                         <span className="flex items-center gap-1.5">
                           {errorTargets.has(t.id) && <span className="tag text-[9.5px] text-hazard">брак</span>}
                           {t.test_scenarios.length > 0 && <span className="tag text-[9.5px] text-amber">{t.test_scenarios.length} сц.</span>}
-                          <span className={`border px-1 font-mono text-[9.5px] font-bold ${type?.cls ?? ''}`}>{type?.label ?? t.type}</span>
+                          <span className={`rounded-[4px] border px-1 font-mono text-[9.5px] font-bold ${type?.cls ?? ''}`}>{type?.label ?? t.type}</span>
                         </span>
                       </span>
                       <span className="line-clamp-2 text-[12.5px] leading-snug text-fg-soft">{t.title}</span>
@@ -318,7 +331,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
                   )
                 })}
                 {ghosts.map(({ task }) => (
-                  <div key={`ghost:${task.id}`} className="fx-retire border border-dashed border-line-input px-3 py-1.5">
+                  <div key={`ghost:${task.id}`} className="fx-retire rounded-[10px] border border-dashed border-line-input px-3 py-1.5">
                     <span className="font-mono text-[11px] text-fg-dim line-through">{task.id}</span>{' '}
                     <span className="text-[12px] text-fg-dim line-through">{task.title}</span>
                   </div>
@@ -334,7 +347,7 @@ function TraceMapImpl({ view, selected, onSelect, gapId }: TraceMapProps) {
 
 function ColumnPlaceholder({ text, active }: { text: string; active: boolean }) {
   return (
-    <div className="relative flex h-24 items-center justify-center overflow-hidden border border-dashed border-line-strong">
+    <div className="relative flex h-24 items-center justify-center overflow-hidden rounded-[10px] border border-dashed border-line-strong">
       {active && <div className="fx-scan absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-transparent via-brand/10 to-transparent" />}
       <span className={`tag ${active ? 'text-brand' : 'text-fg-dim/60'}`}>
         {text}

@@ -44,7 +44,9 @@ export function AgentFlow({ view, replay, speed, onReplay }: AgentFlowProps) {
 
   return (
     <div className="af-root grid h-full grid-cols-[minmax(0,1fr)_minmax(360px,420px)] grid-rows-[auto_auto_minmax(0,1fr)]">
-      <FlowHeader view={view} replay={replay} speed={speed} onReplay={onReplay} />
+      <div className="col-span-2">
+        <FlowHeader view={view} mode="agents" replay={replay} speed={speed} onReplay={onReplay} />
+      </div>
       <PrepStrip view={view} selected={selected === 'prep'} onSelect={() => setSelected('prep')} />
       <FlowCanvas view={view} instances={instances} selected={selected} onSelect={setSelected} particles={particles} live={live} />
       <div className="col-start-2 row-span-2 row-start-2 flex min-h-0 min-w-0">

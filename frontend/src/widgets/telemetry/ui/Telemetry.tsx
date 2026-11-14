@@ -55,7 +55,7 @@ function TelemetryImpl({ view }: { view: RunView }) {
             {open ? '▾' : '▸'} телеметрия
           </button>
           <span className="tag text-fg-soft">
-            [ поток модели{stream ? ` · ${nodeLabel(stream.node)}` : ''} ]
+            поток модели{stream ? ` · ${nodeLabel(stream.node)}` : ''}
           </span>
           {live && stream && (
             <span className="ml-auto flex items-center gap-2">
@@ -76,7 +76,7 @@ function TelemetryImpl({ view }: { view: RunView }) {
       </div>
       <div className="flex min-h-0 flex-col bg-ink">
         <div className="flex h-9 shrink-0 items-center justify-between border-b border-line px-4">
-          <span className="tag text-fg-soft">[ журнал событий ]</span>
+          <span className="tag text-fg-soft">журнал событий</span>
           <span className="tag text-fg-dim">seq {view.lastSeq}</span>
         </div>
         <div ref={logBox} className="min-h-0 flex-1 overflow-y-auto px-4 py-2 font-mono text-[11px] leading-[1.6]">

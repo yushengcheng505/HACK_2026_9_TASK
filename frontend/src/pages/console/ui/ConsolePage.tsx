@@ -8,7 +8,7 @@ export function ConsolePage() {
   const route = useHashRoute()
   const agents = route.name === 'run' && route.mode !== 'pult'
   return (
-    <ConsoleShell route={route} bare={agents}>
+    <ConsoleShell route={route} bare={route.name === 'run'}>
       {route.name === 'launch' && <LaunchPanel />}
       {route.name === 'runs' && <RunsList />}
       {route.name === 'run' && <RunWorkspace key={route.id} runId={route.id} mode={agents ? 'agents' : 'pult'} />}

@@ -28,23 +28,21 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
       <div className="grid gap-px bg-line xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <section className="bg-ink px-6 py-5">
           <div className="mb-4 flex items-start justify-between gap-6">
-            <div className="flex flex-col gap-2">
-              <span className="tag text-fg-dim">[ покрытие контракта ]</span>
-              <p className="max-w-[460px] text-[13px] leading-relaxed text-fg-muted">
-                Каждая операция, которая нужна требованиям, должна получить задачу на реализацию и интеграционный тест.
-                Это считает код по связям, а не модель.
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[14px] font-semibold text-fg">Покрытие контракта</span>
+              <p className="max-w-[420px] text-[13px] leading-relaxed text-fg-muted">
+                Каждой нужной операции — задача и интеграционный тест. Считает код, не модель.
               </p>
             </div>
             <div
-              className={`-rotate-3 border-[3px] px-4 py-2 text-center ${errors ? 'border-hazard text-hazard' : 'border-brand text-brand'}`}
+              className={`shrink-0 rounded-xl border-2 px-4 py-2 text-center ${errors ? 'border-hazard/70 bg-hazard-deep/20 text-hazard' : 'border-brand/60 bg-brand/5 text-brand'}`}
               aria-label={errors ? 'Брак' : 'Принято'}
             >
-              <div className="tag text-[10px]">ОТК · проверки кодом</div>
-              <div className="font-display text-[26px] leading-none font-semibold tracking-[-0.02em]">{errors ? 'БРАК' : 'ПРИНЯТО'}</div>
-              <div className="tag text-[10px]">{errors ? `ошибок: ${errors}` : `покрытие ${view.coverage.coverage_percent}%`}</div>
+              <div className="font-display text-[20px] leading-none font-semibold tracking-[-0.02em]">{errors ? 'Брак' : 'Принято'}</div>
+              <div className="mt-1 font-mono text-[10.5px]">{errors ? `ошибок: ${errors}` : `покрытие ${view.coverage.coverage_percent}%`}</div>
             </div>
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_110px_70px_70px] gap-px border border-line bg-line">
+          <div className="grid grid-cols-[minmax(0,1fr)_110px_70px_70px] gap-px overflow-hidden rounded-xl border border-line bg-line">
             {['Операция', 'Статус', 'Задач', 'Тестов'].map((h) => (
               <div key={h} className="tag bg-surface px-3 py-2 text-fg-dim">{h}</div>
             ))}
@@ -76,9 +74,9 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
         </section>
 
         <section className="bg-ink px-6 py-5">
-          <div className="tag mb-4 flex justify-between text-fg-dim">
-            <span>[ замечания проверок ]</span>
-            <span>{view.issues.length}</span>
+          <div className="mb-4 flex items-baseline gap-2">
+            <span className="text-[14px] font-semibold text-fg">Замечания проверок</span>
+            <span className="font-mono text-[11px] text-fg-dim">{view.issues.length}</span>
           </div>
           {sorted.length === 0 && <p className="text-[14px] text-brand">Замечаний нет: ссылки существуют, связи целы, контракт покрыт.</p>}
           <ul className="flex flex-col gap-1.5">
@@ -87,9 +85,9 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
                 <button
                   type="button"
                   onClick={() => onSelect(keyForId(i.target_id))}
-                  className="press flex w-full cursor-pointer items-start gap-3 border border-line bg-surface px-3 py-2.5 text-left hover:border-line-input"
+                  className="press flex w-full cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:border-line-input"
                 >
-                  <span className={`tag shrink-0 border px-1.5 py-0.5 text-[9.5px] ${SEVERITY[i.severity].cls}`}>{SEVERITY[i.severity].text}</span>
+                  <span className={`tag shrink-0 rounded-[5px] border px-1.5 py-0.5 text-[9.5px] ${SEVERITY[i.severity].cls}`}>{SEVERITY[i.severity].text}</span>
                   <span className="min-w-0">
                     <span className="block font-mono text-[11.5px] font-bold text-fg">{i.target_id}</span>
                     <span className="block text-[12.5px] leading-snug text-fg-muted">{i.message}</span>

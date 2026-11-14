@@ -133,6 +133,11 @@
   animation: fx-retire 420ms ease both;
 }
 
+/* Смена вкладки: короткое проявление без сдвига */
+.fx-fade {
+  animation: fx-fade 160ms ease both;
+}
+
 .fx-pulse {
   animation: fx-pulse 1.4s ease-out infinite;
 }
@@ -172,6 +177,12 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes fx-fade {
+  from {
+    opacity: 0;
   }
 }
 
