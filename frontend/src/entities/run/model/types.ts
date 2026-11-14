@@ -197,6 +197,33 @@ export interface LogLine {
   tone: 'brand' | 'hazard' | 'amber' | 'dim' | 'fg'
 }
 
+/** Один вызов модели агентом в одном круге: что он думал и что ответил. */
+export interface StreamRun {
+  /** Номер захода узла графа (круг доработки для задач и проверки). */
+  round: number
+  startedAt: number
+  lastAt: number
+  reasoning: string
+  content: string
+  /** Начало потока обрезано — храним только хвост. */
+  trimmed: boolean
+}
+
+/** Всё, что известно о вызовах одного экземпляра агента (`token.node`, например `tasks:US-001`). */
+export interface AgentCall {
+  runs: StreamRun[]
+  retries: { at: number; attempt: number; reason: string }[]
+  failure: string | null
+}
+
+export interface ReviewTally {
+  found: number
+  filtered: number
+  confirmed: number
+  downgraded: number
+  rejected: number
+}
+
 export interface RunView {
   runId: string
   title: string
@@ -210,8 +237,8 @@ export interface RunView {
   contractOps: string[]
   requirements: Requirement[]
   stories: Story[]
-  /** ID задач, заменённых после замечаний критика — гаснут на карте. */
-  retired: { storyId: string; task: Task }[]
+  /** ID задач, заменённых после замечаний критика — гаснут на карте. round — заход, в котором их заменили. */
+  retired: { storyId: string; task: Task; round: number }[]
   gaps: Gap[]
   questions: Question[]
   waitingAnswers: boolean
@@ -221,6 +248,16 @@ export interface RunView {
   stats: Stats | null
   criticRound: number
   criticNotes: { story_id: string; problem: string }[]
+  /** Счётчики находок проверяющих и вердиктов скептика по всем кругам. */
+  review: ReviewTally
+  /** Находки проверяющих и пробелы аналитика с вердиктами скептика и решённостью. */
+  findings: Finding[]
+  /** Что после каждого круга проверки ушло на доработку. */
+  feedback: { round: number; notes: { story_id: string; problem: string }[] }[]
+  /** Истории, по которым генераторы задач запущены в текущем заходе. */
+  taskTargets: string[]
+  /** Вызовы модели по экземплярам агентов, ключ — `token.node`. */
+  calls: Record<string, AgentCall>
   nodes: Record<PipelineNode, NodeState>
   activeNode: PipelineNode | null
   tokens: TokenChunk[]

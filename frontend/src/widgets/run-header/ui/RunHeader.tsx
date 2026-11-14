@@ -7,10 +7,11 @@ import { routeHref } from '@/shared/lib/useHashRoute'
 interface RunHeaderProps {
   view: RunView
   replay: boolean
+  speed: number
   onReplay: () => void
 }
 
-export function RunHeader({ view, replay, onReplay }: RunHeaderProps) {
+export function RunHeader({ view, replay, speed, onReplay }: RunHeaderProps) {
   const elapsed = useElapsed(view.startedAt, view.finishedAt)
   const status = STATUS_LABEL[view.status]
   const ready = view.status === 'done'
@@ -24,7 +25,7 @@ export function RunHeader({ view, replay, onReplay }: RunHeaderProps) {
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="tag flex items-center gap-3 text-fg-dim">
           <span>RUN / {view.runId}</span>
-          {replay && <span className="text-amber">[ проигрывание записи · {REPLAY_SPEED}× ]</span>}
+          {replay && <span className="text-amber">[ проигрывание записи · {speed}× ]</span>}
         </span>
         <h1 className="truncate font-display text-[19px] leading-tight font-semibold tracking-[-0.02em] text-fg">
           {view.title || 'Подключение к потоку…'}
@@ -37,6 +38,13 @@ export function RunHeader({ view, replay, onReplay }: RunHeaderProps) {
       )}
 
       <div className="flex shrink-0 items-center gap-5">
+        <a
+          href={routeHref({ name: 'run', id: view.runId, mode: 'agents' })}
+          className="press tag border border-brand-mid px-3 py-2 text-brand hover:border-brand hover:bg-brand hover:text-ink"
+          title="Граф агентов: кто что делает и что передаёт дальше"
+        >
+          агенты
+        </a>
         <div className={`flex items-center gap-2 ${status.cls}`}>
           <span className={`size-2 rounded-full ${status.dot}`} />
           <span className="tag">{status.text}</span>

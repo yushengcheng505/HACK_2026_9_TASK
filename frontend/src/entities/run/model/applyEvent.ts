@@ -1,6 +1,8 @@
 import type {
+  AgentCall,
   Coverage,
   Decomposition,
+  Finding,
   Gap,
   Issue,
   Language,
@@ -32,6 +34,54 @@ export const PIPELINE: readonly { node: PipelineNode; label: string; short: stri
 
 const TOKEN_LIMIT = 600
 const LOG_LIMIT = 400
+/** Сколько символов потока храним на один вызов агента (рассуждение и ответ отдельно). */
+const STREAM_LIMIT = 40_000
+
+/** Узел графа, в котором работает экземпляр агента: по нему считаем круг. */
+export function phaseOfCall(node: string): PipelineNode {
+  const base = node.split(':')[0]
+  if (base === 'requirements' || base === 'analyst' || base === 'stories' || base === 'tasks') return base
+  if (node === 'skeptic:gaps') return 'analyst'
+  return 'critic'
+}
+
+const emptyCall = (): AgentCall => ({ runs: [], retries: [], failure: null })
+
+function patchCall(view: RunView, node: string, patch: (call: AgentCall) => AgentCall): RunView['calls'] {
+  return { ...view.calls, [node]: patch(view.calls[node] ?? emptyCall()) }
+}
+
+function appendStream(view: RunView, node: string, kind: 'content' | 'reasoning', text: string, at: number): RunView['calls'] {
+  const round = view.nodes[phaseOfCall(node)].visits
+  return patchCall(view, node, (call) => {
+    const last = call.runs.at(-1)
+    const run =
+      last && last.round === round
+        ? { ...last }
+        : { round, startedAt: at, lastAt: at, reasoning: '', content: '', trimmed: false }
+    let next = run[kind] + text
+    if (next.length > STREAM_LIMIT) {
+      next = next.slice(-STREAM_LIMIT)
+      run.trimmed = true
+    }
+    run[kind] = next
+    run.lastAt = at
+    const runs = last && last.round === round ? [...call.runs.slice(0, -1), run] : [...call.runs, run]
+    return { ...call, runs }
+  })
+}
+
+/** Ключ экземпляра агента для пропущенного шага проверки. */
+function skippedCallKey(step: string, storyId: string | null): string {
+  if ((step === 'reviewer' || step === 'resolution') && storyId) return `review:${storyId}`
+  if (step === 'editor') return 'junction'
+  return step
+}
+
+function mergeFindings(current: Finding[], incoming: Finding[]): Finding[] {
+  const known = new Set(current.map((f) => f.id))
+  return [...current, ...incoming.filter((f) => !known.has(f.id))]
+}
 
 function idleNodes(): Record<PipelineNode, NodeState> {
   return Object.fromEntries(PIPELINE.map(({ node }) => [node, { phase: 'idle', summary: '', visits: 0 }])) as Record<
@@ -64,6 +114,11 @@ export function emptyRun(runId: string): RunView {
     stats: null,
     criticRound: 0,
     criticNotes: [],
+    review: { found: 0, filtered: 0, confirmed: 0, downgraded: 0, rejected: 0 },
+    findings: [],
+    feedback: [],
+    taskTargets: [],
+    calls: {},
     nodes: idleNodes(),
     activeNode: null,
     tokens: [],
@@ -114,6 +169,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
       return {
         ...next,
         activeNode: node,
+        taskTargets: node === 'tasks' ? ((d.stories as string[] | undefined) ?? []) : view.taskTargets,
         nodes: setNode(view, node, { phase: 'active', visits: view.nodes[node].visits + 1 }),
         log: pushLog(view, line(e, `>>> ${d.label as string}`, 'fg')),
       }
@@ -145,8 +201,10 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
     }
     case 'token': {
       const tokens = view.tokens.length >= TOKEN_LIMIT ? view.tokens.slice(-TOKEN_LIMIT + 1) : view.tokens.slice()
-      tokens.push({ key: e.seq, node: d.node as string, kind: d.kind as 'content' | 'reasoning', text: d.text as string })
-      return { ...next, tokens }
+      const node = d.node as string
+      const kind = d.kind as 'content' | 'reasoning'
+      tokens.push({ key: e.seq, node, kind, text: d.text as string })
+      return { ...next, tokens, calls: appendStream(view, node, kind, d.text as string, e.receivedAt) }
     }
     case 'requirement_created': {
       const r = d.requirement as Requirement
@@ -199,7 +257,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
       const story = view.stories.find((s) => s.id === storyId)
       return {
         ...next,
-        retired: [...view.retired, ...(story?.tasks ?? []).map((task) => ({ storyId, task }))],
+        retired: [...view.retired, ...(story?.tasks ?? []).map((task) => ({ storyId, task, round: view.nodes.tasks.visits }))],
         stories: view.stories.map((s) => (s.id === storyId ? { ...s, tasks: [] } : s)),
         log: pushLog(view, line(e, `${storyId}: задачи переделываются по замечаниям`, 'amber')),
       }
@@ -216,32 +274,61 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
     case 'tasks_failed':
       return {
         ...next,
+        calls: patchCall(view, `tasks:${d.story_id as string}`, (c) => ({ ...c, failure: d.error as string })),
         log: pushLog(view, line(e, `${d.story_id as string}: модель не дала задачи — ${d.error as string}`, 'hazard')),
       }
     case 'llm_retry':
       return {
         ...next,
+        calls: patchCall(view, d.node as string, (c) => ({
+          ...c,
+          retries: [...c.retries, { at: e.receivedAt, attempt: d.attempt as number, reason: d.reason as string }],
+        })),
         log: pushLog(view, line(e, `${d.node as string}: повтор запроса, попытка ${d.attempt as number} — ${d.reason as string}`, 'amber')),
       }
     case 'findings_collected': {
-      const found = d.findings as { verdict: string }[]
+      const found = d.findings as Finding[]
       const filtered = found.filter((f) => f.verdict === 'rejected_by_filter').length
       const round = d.round as number
       return {
         ...next,
+        findings: mergeFindings(view.findings, found),
+        review: { ...view.review, found: view.review.found + found.length, filtered: view.review.filtered + filtered },
         log: pushLog(view, line(e, `${round ? `Проверка, круг ${round}` : 'Пробелы'}: находок ${found.length}, отсеяно фильтром ${filtered}`, 'dim')),
       }
     }
     case 'findings_judged': {
-      const verdicts = d.verdicts as { verdict: string }[]
+      const verdicts = d.verdicts as { id: string; verdict: Finding['verdict']; severity: Finding['severity']; reason: string }[]
       const count = (v: string) => verdicts.filter((x) => x.verdict === v).length
+      const byId = new Map(verdicts.map((v) => [v.id, v]))
       const text = `Скептик: подтверждено ${count('confirmed')}, понижено ${count('downgraded')}, отклонено ${count('rejected')}`
-      return { ...next, log: pushLog(view, line(e, d.error ? `${text} (скептик не ответил)` : text, d.error ? 'hazard' : 'brand')) }
+      return {
+        ...next,
+        findings: view.findings.map((f) => {
+          const v = byId.get(f.id)
+          return v ? { ...f, verdict: v.verdict, severity: v.severity, verdict_reason: v.reason } : f
+        }),
+        review: {
+          ...view.review,
+          confirmed: view.review.confirmed + count('confirmed'),
+          downgraded: view.review.downgraded + count('downgraded'),
+          rejected: view.review.rejected + count('rejected'),
+        },
+        log: pushLog(view, line(e, d.error ? `${text} (скептик не ответил)` : text, d.error ? 'hazard' : 'brand')),
+      }
     }
     case 'findings_resolution': {
-      const items = d.items as { resolution: string | null }[]
+      const items = d.items as { id: string; resolution: Finding['resolution']; note: string }[]
       const open = items.filter((i) => i.resolution === 'not_resolved').length
-      return { ...next, log: pushLog(view, line(e, `Решённость: проверено ${items.length}, не решено ${open}`, open ? 'amber' : 'brand')) }
+      const byId = new Map(items.map((i) => [i.id, i]))
+      return {
+        ...next,
+        findings: view.findings.map((f) => {
+          const r = byId.get(f.id)
+          return r ? { ...f, resolution: r.resolution, resolution_note: r.note } : f
+        }),
+        log: pushLog(view, line(e, `Решённость: проверено ${items.length}, не решено ${open}`, open ? 'amber' : 'brand')),
+      }
     }
     case 'tasks_removed': {
       const storyId = d.story_id as string
@@ -255,6 +342,10 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
     case 'review_skipped':
       return {
         ...next,
+        calls: patchCall(view, skippedCallKey(d.step as string, (d.story_id as string | null) ?? null), (c) => ({
+          ...c,
+          failure: d.reason as string,
+        })),
         log: pushLog(view, line(e, `Не проверено: ${d.step as string}${d.story_id ? ` ${d.story_id as string}` : ''} — ${d.reason as string}`, 'hazard')),
       }
     case 'checks_finished': {
@@ -277,6 +368,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         criticRound: d.round as number,
         criticNotes: notes,
+        feedback: [...view.feedback.filter((f) => f.round !== (d.round as number)), { round: d.round as number, notes }],
         log: pushLog(
           view,
           line(e, notes.length ? `Критик, круг ${d.round as number}: на доработку ${notes.length}` : 'Критик: замечаний нет', notes.length ? 'amber' : 'brand'),
@@ -332,5 +424,6 @@ export function withResult(view: RunView, result: Decomposition): RunView {
     issues: result.issues,
     coverage: result.coverage,
     stats: result.stats,
+    findings: result.findings?.length ? result.findings : view.findings,
   }
 }

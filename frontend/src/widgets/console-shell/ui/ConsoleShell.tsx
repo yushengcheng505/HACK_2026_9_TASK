@@ -7,6 +7,8 @@ import { routeHref } from '@/shared/lib/useHashRoute'
 
 interface ConsoleShellProps {
   route: ConsoleRoute
+  /** Без боковой панели — экран целиком отдан графу агентов. */
+  bare?: boolean
   children: ReactNode
 }
 
@@ -15,11 +17,11 @@ const NAV: { route: ConsoleRoute; index: string; label: string }[] = [
   { route: { name: 'runs' }, index: '02', label: 'Запуски' },
 ]
 
-export function ConsoleShell({ route, children }: ConsoleShellProps) {
+export function ConsoleShell({ route, bare = false, children }: ConsoleShellProps) {
   const health = useHealth()
   return (
-    <div className="bp-grid grid h-full grid-cols-[216px_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col border-r border-line bg-ink/90">
+    <div className={`bp-grid grid h-full ${bare ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[216px_minmax(0,1fr)]'}`}>
+      <aside className={`${bare ? 'hidden' : 'flex'} min-h-0 flex-col border-r border-line bg-ink/90`}>
         <a href="/" className="flex items-center gap-3 border-b border-line px-4 py-4" title="На лендинг">
           <LogoMark />
           <span className="flex flex-col">

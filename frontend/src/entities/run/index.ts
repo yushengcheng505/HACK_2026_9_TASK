@@ -1,5 +1,5 @@
 export type * from './model/types'
-export { PIPELINE, applyEvent, emptyRun, withResult } from './model/applyEvent'
+export { PIPELINE, applyEvent, emptyRun, phaseOfCall, withResult } from './model/applyEvent'
 export { contractOpStatus, nodeKey, parseKey, traceEdges, traceOf } from './model/trace'
 export type { OpStatus, TraceColumn, TraceEdge } from './model/trace'
 export { STATUS_LABEL } from './model/status'

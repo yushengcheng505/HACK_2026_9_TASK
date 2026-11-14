@@ -1,0 +1,1167 @@
+/* Граф агентов. Классы с префиксом af-. Цвета — литералы палитры SYNAPS (src/app/styles/index.css, console.css):
+   CSS-переменные темы Tailwind выводит только для использованных утилит. */
+
+.af-root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  background: #020e0e;
+  color: #e6fff3;
+  font-family: Manrope, system-ui, sans-serif;
+}
+
+/* ---------- шапка ---------- */
+
+.af-header {
+  height: 60px;
+  border-bottom: 1px solid #0f3b32;
+  background: rgb(2 14 14 / 0.92);
+}
+
+.af-seg {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #031412;
+  box-shadow: inset 0 0 0 1px #0f3b32;
+  flex-shrink: 0;
+}
+.af-seg-cap {
+  padding: 0 8px;
+  font: 600 10px 'JetBrains Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8fb8a8;
+}
+.af-seg-item {
+  padding: 5px 11px;
+  border-radius: 7px;
+  font: 600 12px Manrope, sans-serif;
+  color: #a9cfc0;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 140ms var(--ease-out);
+}
+.af-seg-item:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.af-seg-on {
+  background: #0a2c25;
+  color: #01de82;
+  box-shadow: inset 0 0 0 1px rgb(1 222 130 / 0.35);
+}
+.af-seg-item:disabled,
+.af-seg-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-seg-item:not(:disabled):not(.af-seg-on):not(.af-seg-disabled):hover {
+    color: #e6fff3;
+    background: #041a17;
+  }
+}
+
+/* ---------- подготовка ---------- */
+
+.af-prep {
+  border-bottom: 1px solid #0f3b32;
+  background: #020e0e;
+}
+.af-plate {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-align: left;
+  background: #031412;
+  box-shadow: inset 0 0 0 1px #0f3b32;
+  opacity: 0.55;
+  cursor: pointer;
+  transition:
+    opacity 300ms ease,
+    box-shadow 300ms ease,
+    transform 140ms var(--ease-out);
+}
+.af-plate:active {
+  transform: scale(0.985);
+}
+.af-plate-ready {
+  opacity: 1;
+}
+.af-plate-busy {
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px rgb(1 222 130 / 0.5);
+}
+.af-plate-title {
+  font: 600 10px 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8fb8a8;
+}
+.af-plate-value {
+  display: flex;
+  min-width: 0;
+  font: 600 17px Unbounded, sans-serif;
+  letter-spacing: -0.02em;
+  color: #e6fff3;
+}
+.af-plate-ready .af-plate-value {
+  animation: af-rise 360ms var(--ease-out) both;
+  animation-delay: inherit;
+}
+.af-plate-sub {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 11px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+}
+.af-skeleton {
+  display: block;
+  width: 70%;
+  height: 18px;
+  margin: 2px 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #0a2c25 0%, #0f3b32 50%, #0a2c25 100%);
+  background-size: 200% 100%;
+  animation: af-shimmer 1.4s linear infinite;
+}
+.af-confidence {
+  display: block;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 3px;
+  background: #0a2c25;
+  overflow: hidden;
+}
+.af-confidence i {
+  display: block;
+  height: 100%;
+  background: #01de82;
+  transform-origin: left;
+  transition: transform 800ms var(--ease-out);
+}
+
+/* ---------- канвас ---------- */
+
+.af-canvas {
+  background-color: #020e0e;
+  background-image: radial-gradient(#0b2e27 1px, transparent 1.2px);
+  background-size: 22px 22px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  outline: none;
+}
+.af-canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px rgb(1 222 130 / 0.4);
+}
+.af-grabbing,
+.af-grabbing * {
+  cursor: grabbing !important;
+}
+/* Без will-change: иначе браузер растеризует граф один раз в 100% и при приближении растягивает картинку. */
+.af-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+/* Масштаб */
+.af-zoom {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgb(3 20 18 / 0.88);
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 0 0 1px #0f3b32,
+    0 10px 24px -14px rgb(0 0 0 / 0.9);
+  cursor: default;
+}
+.af-zoom button {
+  display: grid;
+  min-width: 30px;
+  height: 28px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 8px;
+  font: 600 15px Manrope, sans-serif;
+  color: #cfefe2;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 140ms var(--ease-out);
+}
+.af-zoom button:active {
+  transform: scale(0.94);
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-zoom button:hover {
+    background: #0a2c25;
+    color: #01de82;
+  }
+}
+.af-zoom .af-zoom-value {
+  min-width: 52px;
+  font: 600 11.5px 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+.af-zoom-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: #124a3d;
+}
+.af-zoom-hint {
+  padding: 0 8px 0 6px;
+  font: 500 10.5px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+  white-space: nowrap;
+}
+
+/* Рождение агента: летящая копия робота и искры при приземлении */
+.af-seed {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 25;
+  width: 60px;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.6)) drop-shadow(0 0 10px rgb(1 222 130 / 0.35));
+  will-change: transform, opacity;
+}
+.af-seed svg {
+  display: block;
+  width: 52px;
+  height: auto;
+}
+.af-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  will-change: transform, opacity;
+}
+.af-group {
+  fill: rgb(4 26 23 / 0.55);
+  stroke: rgb(157 247 207 / 0.07);
+  stroke-width: 1;
+}
+.af-group-label {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  font: 600 11px 'JetBrains Mono', monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a9cfc0;
+  margin: -3px 0 0 -6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  background: #031513;
+}
+.af-col-label {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 600 11px Manrope, sans-serif;
+  color: #a9cfc0;
+}
+.af-col-label b {
+  margin-left: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  color: #01de82;
+}
+.af-loop-label {
+  position: absolute;
+  font: 600 10.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f4b942;
+}
+
+/* Рёбра: ждут — тонкие, пройдены — зелёные, активны — бегущий пунктир */
+.af-edge {
+  fill: none;
+  stroke: #1f6b56;
+  stroke-width: 1.75;
+  transition:
+    stroke 400ms ease,
+    stroke-width 400ms ease;
+}
+.af-edge-passed {
+  stroke: #2cc28f;
+  stroke-width: 2;
+}
+.af-edge-active {
+  stroke: rgb(1 222 130 / 0.7);
+  stroke-width: 2.25;
+}
+.af-edge-loop {
+  stroke: rgb(244 185 66 / 0.75);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+}
+.af-edge-loop-active {
+  stroke: rgb(244 185 66 / 0.9);
+  stroke-width: 2.25;
+}
+.af-edge-gaps {
+  stroke: rgb(255 90 78 / 0.6);
+  stroke-width: 1.75;
+  stroke-dasharray: 3 5;
+}
+.af-edge-gaps-active {
+  stroke: rgb(255 90 78 / 0.8);
+}
+/* Фокус на узле: его рёбра ярче и поверх, остальные отходят на второй план */
+.af-edge-muted {
+  opacity: 0.22;
+  transition: opacity 200ms ease;
+}
+.af-edge-lit {
+  transition: opacity 200ms ease;
+}
+.af-edge-lit .af-edge {
+  stroke: #3bf0a2;
+  stroke-width: 2.5;
+}
+.af-edge-lit .af-edge-loop,
+.af-edge-lit .af-edge-loop-active {
+  stroke: #f4b942;
+}
+.af-edge-lit .af-edge-gaps,
+.af-edge-lit .af-edge-gaps-active {
+  stroke: #ff5a4e;
+}
+.af-edge-flow {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 2 12;
+  animation: af-flow 0.7s linear infinite;
+}
+.af-edge-flow-active {
+  stroke: #3bf0a2;
+}
+.af-edge-flow-loop-active {
+  stroke: #f4b942;
+}
+.af-edge-flow-gaps-active {
+  stroke: #ff5a4e;
+}
+
+/* ---------- узлы ---------- */
+
+.af-node {
+  position: absolute;
+  z-index: 10;
+  cursor: pointer;
+  border-radius: 16px;
+  background: #031412;
+  box-shadow:
+    inset 0 0 0 1px #0f3b32,
+    0 8px 18px -12px rgb(0 0 0 / 0.8);
+  transition:
+    box-shadow 260ms ease,
+    background-color 260ms ease,
+    transform 140ms var(--ease-out);
+}
+.af-node:active {
+  transform: scale(0.97);
+}
+.af-node:focus-visible,
+.af-plate:focus-visible,
+.af-gate:focus-visible {
+  outline: 2px solid #01de82;
+  outline-offset: 3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-node:hover {
+    box-shadow:
+      inset 0 0 0 1px #1e5446,
+      0 8px 18px -12px rgb(0 0 0 / 0.8);
+  }
+}
+
+.af-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 8px 12px;
+}
+.af-card-name {
+  font: 700 12.5px Manrope, sans-serif;
+  line-height: 1.15;
+  text-align: center;
+  color: #e6fff3;
+}
+.af-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 3px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 500 10.5px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+}
+
+.af-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 0 8px;
+  overflow: hidden;
+}
+.af-chip-id {
+  font: 700 12px 'JetBrains Mono', monospace;
+  color: #e6fff3;
+}
+.af-chip-meta {
+  margin-top: 3px;
+  font: 500 10px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+  white-space: nowrap;
+}
+.af-chip-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #01de82, transparent);
+  animation: af-progress 1.2s var(--ease-in-out) infinite;
+}
+
+.af-bot {
+  display: block;
+  transform-origin: 50% 100%;
+}
+.af-bob {
+  animation: af-bob 0.9s ease-in-out infinite;
+}
+
+.af-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #124a3d;
+}
+
+/* Статусы */
+.af-status-idle .af-bot {
+  opacity: 0.45;
+  filter: saturate(0.5);
+}
+.af-status-idle .af-card-name,
+.af-status-idle .af-chip-id {
+  color: #8fb8a8;
+}
+.af-status-queued {
+  box-shadow:
+    inset 0 0 0 1px rgb(1 222 130 / 0.35),
+    0 8px 18px -12px rgb(0 0 0 / 0.8);
+}
+.af-status-queued .af-dot {
+  background: #1e8f6e;
+  animation: af-blink 1s steps(1) infinite;
+}
+.af-status-working {
+  background: #052119;
+  box-shadow:
+    inset 0 0 0 1.5px #01de82,
+    0 0 0 4px rgb(1 222 130 / 0.1),
+    0 0 28px rgb(1 222 130 / 0.18);
+}
+.af-status-working .af-dot {
+  background: #01de82;
+  box-shadow: 0 0 6px rgb(1 222 130 / 0.7);
+}
+.af-status-working .af-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #01de82;
+  animation: af-ping 1.4s cubic-bezier(0.23, 1, 0.32, 1) infinite;
+}
+.af-status-working .af-card-meta {
+  color: #01de82;
+}
+.af-status-done .af-dot {
+  background: #9df7cf;
+}
+.af-status-waiting {
+  box-shadow:
+    inset 0 0 0 1.5px #f4b942,
+    0 0 0 4px rgb(244 185 66 / 0.1);
+}
+.af-status-waiting .af-dot {
+  background: #f4b942;
+}
+.af-status-failed {
+  box-shadow: inset 0 0 0 1.5px #ff5a4e;
+}
+.af-status-failed .af-dot {
+  background: #ff5a4e;
+}
+
+.af-selected {
+  box-shadow:
+    inset 0 0 0 2px #e6fff3,
+    0 0 0 4px rgb(230 255 243 / 0.08) !important;
+}
+
+/* Пустые ряды до появления историй */
+.af-ghost {
+  position: absolute;
+  display: flex;
+  width: 150px;
+  flex-direction: column;
+  gap: 8px;
+}
+.af-ghost-chip {
+  height: 48px;
+  border-radius: 14px;
+  border: 1px dashed #124a3d;
+}
+.af-ghost-label {
+  font: 500 10.5px 'JetBrains Mono', monospace;
+  line-height: 1.35;
+  text-align: center;
+  color: #8fb8a8;
+}
+
+/* ОТК */
+.af-gate {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #031412;
+  box-shadow: inset 0 0 0 1px #124a3d;
+  cursor: pointer;
+  transition: box-shadow 300ms ease;
+}
+.af-gate-active {
+  box-shadow:
+    inset 0 0 0 1.5px #9df7cf,
+    0 0 22px rgb(157 247 207 / 0.15);
+}
+.af-gate-done {
+  box-shadow: inset 0 0 0 1px #1e8f6e;
+}
+.af-gate-label {
+  writing-mode: vertical-rl;
+  rotate: 180deg;
+  font: 600 10.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #a9cfc0;
+}
+.af-gate-cov {
+  position: absolute;
+  top: 8px;
+  font: 700 9.5px 'JetBrains Mono', monospace;
+}
+.af-gate-scan {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 30%;
+  background: linear-gradient(180deg, transparent, rgb(157 247 207 / 0.35), transparent);
+  animation: af-scan 1.1s linear infinite;
+}
+
+/* Итог */
+.af-result {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  opacity: 0.6;
+}
+.af-result-done {
+  opacity: 1;
+  box-shadow:
+    inset 0 0 0 1.5px #1e8f6e,
+    0 0 26px rgb(1 222 130 / 0.12);
+}
+.af-result-title {
+  font: 600 14px Unbounded, sans-serif;
+  color: #e6fff3;
+}
+.af-result-row {
+  display: flex;
+  justify-content: space-between;
+  font: 500 11px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+}
+.af-result-row b {
+  color: #e6fff3;
+}
+.af-result-state {
+  margin-top: auto;
+  font: 600 10px 'JetBrains Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Метки артефактов на рёбрах */
+.af-particle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px 2px 5px;
+  border-radius: 999px;
+  background: rgb(2 14 14 / 0.92);
+  box-shadow: inset 0 0 0 1px currentColor;
+  font: 700 9.5px 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+.af-particle i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+.af-tone-brand {
+  color: #01de82;
+}
+.af-tone-mint {
+  color: #9df7cf;
+}
+.af-tone-amber {
+  color: #f4b942;
+}
+.af-tone-hazard {
+  color: #ff5a4e;
+}
+.af-tone-dim {
+  color: #a9cfc0;
+}
+
+/* ---------- инспектор ---------- */
+
+.af-inspector {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  border-left: 1px solid #0f3b32;
+  background: #031412;
+}
+.af-inspector-bar {
+  display: flex;
+  height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid #0f3b32;
+}
+.af-back {
+  font: 600 12px Manrope, sans-serif;
+  color: #a9cfc0;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-back:hover {
+    color: #01de82;
+  }
+}
+.af-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px 10px;
+}
+.af-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font: 600 10px 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a9cfc0;
+  box-shadow: inset 0 0 0 1px #124a3d;
+}
+.af-status-pill.af-status-working {
+  color: #01de82;
+  background: rgb(1 222 130 / 0.08);
+}
+.af-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0 20px;
+}
+.af-stats div {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #041a17;
+}
+.af-stats dt {
+  font: 600 9.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8fb8a8;
+}
+.af-stats dd {
+  margin-top: 2px;
+  font: 600 16px Unbounded, sans-serif;
+  color: #e6fff3;
+}
+.af-tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 14px;
+  padding: 0 14px;
+  border-bottom: 1px solid #0f3b32;
+}
+.af-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 8px;
+  font: 600 12.5px Manrope, sans-serif;
+  color: #8fb8a8;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+.af-tab::after {
+  content: '';
+  position: absolute;
+  inset-inline: 6px;
+  bottom: -1px;
+  height: 2px;
+  background: #01de82;
+  transform: scaleX(0);
+  transition: transform 200ms var(--ease-out);
+}
+.af-tab-on {
+  color: #e6fff3;
+}
+.af-tab-on::after {
+  transform: scaleX(1);
+}
+.af-dot-live {
+  background: #01de82;
+  animation: af-pulse 1.2s ease-out infinite;
+}
+.af-detail-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 24px;
+}
+
+.af-section + .af-section {
+  margin-top: 20px;
+}
+.af-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  font: 600 10.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a9cfc0;
+}
+.af-section-count {
+  color: #01de82;
+}
+.af-empty {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #8fb8a8;
+}
+.af-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.af-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px 8px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  background: #041a17;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #cfefe2;
+}
+.af-line-dim {
+  opacity: 0.45;
+}
+.af-line-dim .af-line-id {
+  text-decoration: line-through;
+}
+.af-line-id {
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font: 700 11px 'JetBrains Mono', monospace;
+  line-height: 1.65;
+  color: #01de82;
+}
+/* Длинный ID (PROTO:…) — текст уходит на строку ниже во всю ширину, а не жмётся в узкий столбик */
+.af-line-text {
+  flex: 1 1 11rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.af-line-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #0a2c25;
+  font: 600 9.5px 'JetBrains Mono', monospace;
+  color: #a9cfc0;
+}
+.af-line-sub {
+  display: block;
+  margin-top: 2px;
+  font: 500 10.5px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+}
+.af-finding {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #041a17;
+}
+.af-sev {
+  padding: 1px 6px;
+  border-radius: 5px;
+  font: 700 9.5px 'JetBrains Mono', monospace;
+}
+.af-sev-critical,
+.af-sev-high {
+  background: rgb(255 90 78 / 0.15);
+  color: #ff5a4e;
+}
+.af-sev-medium {
+  background: rgb(244 185 66 / 0.14);
+  color: #f4b942;
+}
+.af-sev-low {
+  background: #0a2c25;
+  color: #a9cfc0;
+}
+.af-verdict {
+  margin-left: auto;
+  font: 600 10px 'JetBrains Mono', monospace;
+}
+.af-v-confirmed {
+  color: #ff5a4e;
+}
+.af-v-downgraded {
+  color: #f4b942;
+}
+.af-v-rejected {
+  color: #8fb8a8;
+}
+.af-v-pending {
+  color: #9df7cf;
+}
+.af-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+.af-note-amber {
+  background: rgb(244 185 66 / 0.07);
+  box-shadow: inset 0 0 0 1px rgb(244 185 66 / 0.3);
+}
+.af-note-brand {
+  background: rgb(1 222 130 / 0.06);
+  box-shadow: inset 0 0 0 1px rgb(1 222 130 / 0.25);
+}
+.af-note-title {
+  font: 600 10.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f4b942;
+}
+.af-note-brand .af-note-title {
+  color: #01de82;
+}
+.af-note-body {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cfefe2;
+}
+.af-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px #124a3d;
+  font: 600 11px 'JetBrains Mono', monospace;
+  color: #a9cfc0;
+  cursor: pointer;
+}
+.af-pill-on {
+  background: #0a2c25;
+  color: #01de82;
+  box-shadow: inset 0 0 0 1px rgb(1 222 130 / 0.4);
+}
+.af-cta {
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #01de82;
+  font: 700 12.5px Manrope, sans-serif;
+  color: #020e0e;
+}
+.af-stream {
+  padding: 12px;
+  border-radius: 12px;
+  background: #020e0e;
+  box-shadow: inset 0 0 0 1px #0f3b32;
+}
+.af-stream-label {
+  margin: 4px 0 6px;
+  font: 600 9.5px 'JetBrains Mono', monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1e8f6e;
+}
+.af-stream-text {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 400 11.5px/1.55 'JetBrains Mono', monospace;
+}
+.af-caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: #01de82;
+  vertical-align: -2px;
+  animation: af-blink 1s steps(1) infinite;
+}
+.af-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #cfefe2;
+}
+.af-timeline li {
+  display: flex;
+  gap: 10px;
+}
+.af-timeline-at {
+  flex-shrink: 0;
+  width: 52px;
+  font: 600 11px 'JetBrains Mono', monospace;
+  color: #8fb8a8;
+}
+
+/* Обзор */
+.af-busy {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #041a17;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.af-busy.af-status-working {
+  box-shadow: inset 0 0 0 1px rgb(1 222 130 / 0.4);
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-busy:hover {
+    background: #052119;
+  }
+}
+.af-steps {
+  display: flex;
+  flex-direction: column;
+}
+.af-step {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #8fb8a8;
+  cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-step:hover {
+    background: #041a17;
+  }
+}
+.af-step i {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px #165446;
+}
+.af-step b {
+  font-weight: 600;
+}
+.af-step-active,
+.af-step-done {
+  color: #e6fff3;
+}
+.af-step-done i {
+  background: #1e8f6e;
+  box-shadow: none;
+}
+.af-step-active i {
+  background: #01de82;
+  box-shadow: none;
+  animation: af-pulse 1.2s ease-out infinite;
+}
+.af-step-waiting i {
+  background: #f4b942;
+  box-shadow: none;
+}
+
+/* ---------- ключевые кадры ---------- */
+
+@keyframes af-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@keyframes af-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+@keyframes af-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(1 222 130 / 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 7px rgb(1 222 130 / 0);
+  }
+}
+@keyframes af-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+@keyframes af-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes af-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+@keyframes af-scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(340%);
+  }
+}
+@keyframes af-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes af-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-edge-flow,
+  .af-bob,
+  .af-chip-progress,
+  .af-gate-scan,
+  .af-skeleton,
+  .af-status-working .af-dot,
+  .af-status-queued .af-dot,
+  .af-dot-live,
+  .af-step-active i,
+  .af-caret {
+    animation: none;
+  }
+  .af-plate-ready .af-plate-value {
+    animation-name: af-fade;
+  }
+  .af-status-working .af-dot::after {
+    display: none;
+  }
+}
+@keyframes af-fade {
+  from {
+    opacity: 0;
+  }
+}

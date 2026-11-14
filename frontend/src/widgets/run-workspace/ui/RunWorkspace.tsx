@@ -10,15 +10,18 @@ import { QuestionsPanel } from '@/widgets/questions-panel'
 import { ResultsTable } from '@/widgets/results-table'
 import { QcReport } from '@/widgets/qc-report'
 import { GapsBoard } from '@/widgets/gaps-board'
+import { AgentFlow } from '@/widgets/agent-flow'
+import type { RunMode } from '@/shared/lib/useHashRoute'
 
 type Tab = 'map' | 'table' | 'qc' | 'gaps'
 
 interface RunWorkspaceProps {
   runId: string
+  mode: RunMode
 }
 
-export function RunWorkspace({ runId }: RunWorkspaceProps) {
-  const { view, refresh, replay, startReplay } = useRunStream(runId)
+export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
+  const { view, refresh, replay, speed, startReplay } = useRunStream(runId)
   const [tab, setTab] = useState<Tab>('map')
   const [selected, setSelected] = useState<string | null>(null)
   const [gapId, setGapId] = useState<string | null>(null)
@@ -52,9 +55,18 @@ export function RunWorkspace({ runId }: RunWorkspaceProps) {
     { id: 'gaps', label: 'Пробелы', badge: String(view.gaps.length), tone: view.gaps.length ? 'text-hazard' : 'text-fg-dim' },
   ]
 
+  if (mode === 'agents') {
+    return (
+      <div className="relative h-full">
+        <AgentFlow view={view} replay={replay} speed={speed} onReplay={startReplay} />
+        {view.waitingAnswers && !replay && <QuestionsPanel runId={runId} questions={view.questions} />}
+      </div>
+    )
+  }
+
   return (
     <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_auto_minmax(0,1fr)_auto]">
-      <RunHeader view={view} replay={replay} onReplay={startReplay} />
+      <RunHeader view={view} replay={replay} speed={speed} onReplay={() => startReplay()} />
       <RunMetrics view={view} />
       <PipelineRail view={view} />
 

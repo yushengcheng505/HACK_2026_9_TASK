@@ -6,11 +6,12 @@ import { useHashRoute } from '@/shared/lib/useHashRoute'
 
 export function ConsolePage() {
   const route = useHashRoute()
+  const agents = route.name === 'run' && route.mode !== 'pult'
   return (
-    <ConsoleShell route={route}>
+    <ConsoleShell route={route} bare={agents}>
       {route.name === 'launch' && <LaunchPanel />}
       {route.name === 'runs' && <RunsList />}
-      {route.name === 'run' && <RunWorkspace key={route.id} runId={route.id} />}
+      {route.name === 'run' && <RunWorkspace key={route.id} runId={route.id} mode={agents ? 'agents' : 'pult'} />}
     </ConsoleShell>
   )
 }

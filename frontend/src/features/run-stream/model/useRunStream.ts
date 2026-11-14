@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { applyEvent, emptyRun, withResult } from '@/entities/run'
 import type { RunEvent, RunRecord, RunView } from '@/entities/run'
-import { api, eventsUrl } from '@/shared/api'
+import { REPLAY_SPEED, api, eventsUrl } from '@/shared/api'
 
 const EVENT_TYPES = [
   'run_started', 'node_started', 'node_finished', 'sources_parsed', 'language_detected', 'token',
@@ -17,6 +17,7 @@ const TERMINAL = new Set(['run_finished', 'run_failed'])
 export function useRunStream(runId: string) {
   const [view, setView] = useState<RunView>(() => emptyRun(runId))
   const [replay, setReplay] = useState(false)
+  const [speed, setSpeed] = useState(REPLAY_SPEED)
   const [epoch, setEpoch] = useState(0)
   const queue = useRef<RunEvent[]>([])
   const frame = useRef(0)
@@ -43,7 +44,7 @@ export function useRunStream(runId: string) {
 
   useEffect(() => {
     queue.current = []
-    const source = new EventSource(eventsUrl(runId, replay))
+    const source = new EventSource(eventsUrl(runId, replay, speed))
     let closed = false
 
     const flush = () => {
@@ -85,13 +86,17 @@ export function useRunStream(runId: string) {
       if (frame.current) cancelAnimationFrame(frame.current)
       frame.current = 0
     }
-  }, [runId, replay, epoch, refresh])
+  }, [runId, replay, speed, epoch, refresh])
 
-  const startReplay = useCallback(() => {
-    setView(emptyRun(runId))
-    setReplay(true)
-    setEpoch((e) => e + 1)
-  }, [runId])
+  const startReplay = useCallback(
+    (nextSpeed: number = REPLAY_SPEED) => {
+      setView(emptyRun(runId))
+      setReplay(true)
+      setSpeed(nextSpeed)
+      setEpoch((e) => e + 1)
+    },
+    [runId],
+  )
 
-  return { view, setView, refresh, replay, startReplay }
+  return { view, setView, refresh, replay, speed, startReplay }
 }
