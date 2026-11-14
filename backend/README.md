@@ -36,14 +36,17 @@ uv run langgraph dev        # граф в LangGraph Studio (нужен паке�
 результата и лист «Проверка» в XLSX.
 
 ## Мини-бенчмарк проверки
-Сравнивает варианты `critic`, `review-noskeptic`, `review`, `review-nosimplifier` на той же модели:
+Сравнивает варианты проверки на той же модели. Вариант (`bench/harness.py`, `VARIANTS`) — это
+роли (`critic`, со скептиком и упрощателем или без), лимит токенов и правки промптов поверх
+`prompts/`; изменённые промпты варианта кладутся в `<out>/_prompts/<вариант>`.
 ```bash
-uv run python -m bench e2e    --out bench/results/<метка>   # полные прогоны демо-эпика
-uv run python -m bench review --out bench/results/<метка>   # 7 внедрённых дефектов + контроль
-uv run python -m bench report --out bench/results/<метка>   # отчёт report.md
+uv run python -m bench e2e    --out bench/results/<метка> [--variants a,b]   # полные прогоны демо-эпика
+uv run python -m bench review --out bench/results/<метка> [--extended]       # дефекты M1–M7 (+M8–M9) и контроль
+uv run python -m bench report --out bench/results/<метка>                    # отчёт report.md
 ```
 Дефекты внедряются в итоговые результаты прогонов из `data/app.db` (`bench/mutations.py`),
-готовые прогоны при перезапуске не повторяются. Детали — в плане
+готовые прогоны при перезапуске не повторяются, сорванные провайдером (429, 5xx, обрыв) —
+не сохраняются. Результаты и выводы: `bench/results/2026-11-14*/report.md`. Детали — в плане
 `../docs/superpowers/plans/2026-11-14-review-workflow.md`.
 
 ## Быстрая проверка

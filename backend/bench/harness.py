@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from langgraph.checkpoint.memory import InMemorySaver
-from openai import APIConnectionError, InternalServerError, RateLimitError
+from openai import APIConnectionError, APIError, InternalServerError, RateLimitError
 
 from app.config import get_settings
 from app.graph import build_graph
@@ -157,6 +157,13 @@ RATE_LIMIT_ATTEMPTS = 8
 PROVIDER_ERRORS = (RateLimitError, InternalServerError, APIConnectionError)
 
 
+def provider_failed(error: BaseException | str) -> bool:
+    """Сбой провайдера, а не процесса: 429, 5xx, обрыв связи, оборванный поток (голый APIError)."""
+    if isinstance(error, str):
+        return any(f"{e.__name__}(" in error for e in (*PROVIDER_ERRORS, APIError))
+    return isinstance(error, PROVIDER_ERRORS) or type(error) is APIError
+
+
 class MeteredLLM:
     """Обёртка над LLM: на каждый вызов — роль, символы входа и выхода, повторы, время, успех.
 
@@ -191,8 +198,8 @@ class MeteredLLM:
                 try:
                     out = await self.inner.complete_json(prompt_name, user, schema, on_token=token, on_retry=retry)
                     break
-                except PROVIDER_ERRORS:
-                    if attempt == RATE_LIMIT_ATTEMPTS:
+                except APIError as e:
+                    if not provider_failed(e) or attempt == RATE_LIMIT_ATTEMPTS:
                         raise
                     rec["rate_limited"] += 1
                     await asyncio.sleep(self.backoff * attempt)

@@ -19,7 +19,7 @@ from app.demos import load_demo
 from app.graph import encode_files
 
 from bench.bases import base_state
-from bench.harness import PROVIDER_ERRORS, VARIANTS, run_graph, variant_llm
+from bench.harness import VARIANTS, provider_failed, run_graph, variant_llm
 from bench.mutations import mutate
 from bench.score import score_e2e, score_review
 
@@ -27,7 +27,7 @@ BASES = ["affbf77db561", "8ed2ce672494"]
 
 
 def _save(path: Path, data: dict) -> None:
-    if any(e.__name__ in (data["run"].get("error") or "") for e in PROVIDER_ERRORS):
+    if provider_failed(data["run"].get("error") or ""):
         print(f"! {path.stem}: провайдер перегружен, прогон не сохранён — повторите команду", flush=True)
         return
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
