@@ -1,0 +1,40 @@
+services:
+  haproxy:
+    image: haproxy:3.2-alpine
+    env_file: .env
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "127.0.0.1:8081:8081"
+      - "127.0.0.1:8404:8404"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  backend:
+    build: ../backend
+    env_file:
+      - path: ../backend/.env
+        required: false
+    environment:
+      LLM_BASE_URL: http://haproxy:8081/v1
+      DATA_DIR: /data
+      DEMO_DIR: /demo
+    volumes:
+      - ../demo:/demo:ro
+      - backend-data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - haproxy
+
+  web:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:

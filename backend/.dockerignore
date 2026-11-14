@@ -1,0 +1,11 @@
+.env
+.env.*
+.venv/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.langgraph_api/
+data/
+tests/
+bench/results/
+*.log

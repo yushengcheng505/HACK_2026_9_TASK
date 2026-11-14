@@ -104,3 +104,20 @@ app/
   main.py       HTTP API
 ```
 Данные — в `data/` (`app.db` — запуски и события, `checkpoints.db` — состояние графа).
+
+## Запуск в Docker
+Нужен Docker Compose ≥2.24; из корня: `cd deploy && cp .env.example .env && docker compose up -d --build`.
+В `deploy/.env` задайте `LLM_PRIMARY` и `LLM_BACKUP` как `host:port`; оба должны отвечать 200 на `/v1/models`.
+Пример: модели на хосте `host.docker.internal:8080` и `host.docker.internal:8090`. На Debian это работает без настройки;
+если включён `ufw`, разрешите доступ из сети Docker: `sudo ufw allow from 172.16.0.0/12 to any port 8080,8090 proto tcp`.
+Адрес и порт интерфейса — `WEB_BIND` и `WEB_PORT` в `deploy/.env` (по умолчанию `0.0.0.0:18080`).
+Настройки модели и секреты — в необязательном `backend/.env`; адрес LLM заменяется на `http://haproxy:8081/v1`.
+Интерфейсы: http://localhost:18080/, `/console/`, `/agents/`; API: `curl localhost:18080/api/health`.
+backend:8000 наружу не публикуется — к нему ходит nginx (`/api`), в том числе вебхук Bitbucket.
+Статистика HAProxy: http://localhost:8404/; прокси моделей: http://localhost:8081/v1/models (только localhost).
+Проверка: `docker compose config -q`; конфиг HAProxy: `docker compose exec haproxy haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg`.
+Для демонстрации резерва создайте две временные папки с `v1/models`: `{"data":[{"id":"primary"}]}` и `{"data":[{"id":"backup"}]}`.
+Запустите `python3 -m http.server 8080 --directory <primary>` и `python3 -m http.server 8090 --directory <backup>`.
+`curl localhost:8081/v1/models` → primary; остановите primary, подождите 5 с: тот же curl → backup, в статистике primary DOWN.
+После демонстрации остановите обе заглушки и удалите временные папки; для реальной работы настройте адреса моделей.
+Остановка: `docker compose down`; данные SQLite сохраняются в томе `backend-data`, демо подключены read-only.
