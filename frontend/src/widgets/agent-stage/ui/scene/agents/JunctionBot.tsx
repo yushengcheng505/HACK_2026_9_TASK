@@ -24,7 +24,6 @@ export function JunctionBot({ expression, active, blinkDelay }: BotProps) {
       <circle cx="0" cy="126" r="5" fill={palette.fg} className={active ? 'fx-spark' : 'fx-hidden'} />
       <rect x="-60" y="150" width="120" height="100" rx="26" fill={palette.ink} stroke={palette.mint} className="pen-2" />
       <AgentFace expression={expression} ink={palette.mint} blinkDelay={blinkDelay} />
-      <path d="M-14 230 L-7 226 L0 230 L7 226 L14 230" fill="none" stroke={palette.mint} className="pen-3" opacity="0.7" />
     </>
   )
 }

@@ -26,7 +26,6 @@ export function OrchestratorBot({ mood }: OrchestratorBotProps) {
       <ExpressionLayer visible={mood === 'done'}>
         <path d="M160 190 Q172 170 184 190" fill="none" stroke={palette.ink} className="pen-5" />
         <path d="M216 190 Q228 170 240 190" fill="none" stroke={palette.ink} className="pen-5" />
-        <path d="M190 212 Q200 220 210 212" fill="none" stroke={palette.ink} className="pen-3" />
       </ExpressionLayer>
 
       <circle cx="270" cy="236" r="3.5" fill={palette.ink} opacity="0.45" />

@@ -6,8 +6,8 @@ const EYE_Y = 180
 const TICKETS = [-44, -12, 20] as const
 
 /**
- * Генератор задач: наушники и «</>».
- * Без дела наушники еле заметно пульсируют; в работе качают в такт, «</>» мигает,
+ * Генератор задач: наушники.
+ * Без дела наушники еле заметно пульсируют; в работе качают в такт,
  * а из головы одна за другой вылетают карточки задач.
  */
 export function TasksBot({ expression, active, blinkDelay }: BotProps) {
@@ -41,9 +41,6 @@ export function TasksBot({ expression, active, blinkDelay }: BotProps) {
           </>
         }
       />
-      <text x="0" y="236" className={active ? 'scene-code fx-code' : 'scene-code'} fill={active ? palette.brand : palette.brandMid}>
-        {'</>'}
-      </text>
     </>
   )
 }

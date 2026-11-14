@@ -1,5 +1,5 @@
 import { AGENTS, type AgentId, type AgentTeam } from '@/entities/agent'
-import type { QuadCurve } from '@/shared/lib/math'
+import type { Point, QuadCurve } from '@/shared/lib/math'
 
 /** Координаты в системе viewBox сцены 1200×600. */
 export const SCENE_SIZE = { width: 1200, height: 600 } as const
@@ -13,13 +13,11 @@ const COLUMNS = [560, 735, 910, 1085] as const
 export interface TeamRow {
   /** Центр корпусов роботов этой команды по Y. */
   bodyY: number
-  /** Базовая линия подписи команды над роботами. */
-  labelY: number
 }
 
 export const TEAM_ROWS: Record<AgentTeam, TeamRow> = {
-  decomposition: { bodyY: 150, labelY: 44 },
-  review: { bodyY: 412, labelY: 304 },
+  decomposition: { bodyY: 150 },
+  review: { bodyY: 412 },
 }
 
 /** Подписи под роботом — смещения от центра корпуса, в координатах сцены. */
@@ -65,29 +63,41 @@ export interface FlightRoute {
   back: QuadCurve
 }
 
-/** Верх антенны робота над центром корпуса и низ его чипа статуса. */
-const AGENT_TOP = 70
-const AGENT_BOTTOM = CAPTION.chipY + CAPTION.chipHeight + 6
+/** Габарит робота с подписью относительно центра корпуса: всё, через что самолётик лететь не должен. */
+export const AGENT_BOUNDS = { halfWidth: 78, top: 72, bottom: CAPTION.chipY + CAPTION.chipHeight } as const
+
+/** Подписи рядов стоят вертикально слева от роботов, чтобы коридор между рядами был свободен. */
+export const TEAM_LABEL_X = 466
+
+/** Где самолётики касаются NAPS: вылет к верхнему ряду, приём от него (справа от клавиатуры), вылет к нижнему, приём в консоль. */
+const NAPS_PORTS = {
+  toTop: [292, 150],
+  fromTop: [308, 270],
+  toBottom: [318, 300],
+  fromBottom: [362, 540],
+} as const
 
 /**
- * Маршруты вложены, чтобы у каждого самолётика была своя дорожка:
- * декомпозиция получает задачи сверху, отдаёт в промежуток между рядами;
- * проверка получает через промежуток, отдаёт снизу — прямо в консоль NAPS.
+ * У каждого самолётика своя дорожка, и ни одна не проходит через роботов:
+ * верхний ряд получает задачи по дугам над собой и отдаёт ответы по верхней полосе коридора между рядами;
+ * нижний получает по нижней полосе коридора (сверху, над головами соседей) и отдаёт под собой — в консоль NAPS.
  */
 function routeFor(id: AgentId): FlightRoute {
   const { cx, bodyY } = AGENT_SLOTS[id]
   const column = columnOf(id)
   const team = AGENTS.find((a) => a.id === id)!.team
+  const top: Point = [cx, bodyY - AGENT_BOUNDS.top - 4]
+  const bottom: Point = [cx, bodyY + AGENT_BOUNDS.bottom + 6]
 
   if (team === 'decomposition') {
     return {
-      out: { from: [292, 150], control: [(292 + cx) / 2, 30 - column * 26], to: [cx, bodyY - AGENT_TOP] },
-      back: { from: [cx, bodyY + AGENT_BOTTOM], control: [(cx + 300) / 2, 300 + column * 9], to: [300, 236] },
+      out: { from: NAPS_PORTS.toTop, control: [(292 + cx) / 2, 30 - column * 26], to: top },
+      back: { from: bottom, control: [(cx + 300) / 2, 290 + column * 4], to: NAPS_PORTS.fromTop },
     }
   }
   return {
-    out: { from: [300, 200], control: [(300 + cx) / 2, 250 + column * 8], to: [cx, bodyY - AGENT_TOP] },
-    back: { from: [cx, bodyY + AGENT_BOTTOM], control: [(cx + 360) / 2, 600 + column * 6], to: [358, 468] },
+    out: { from: NAPS_PORTS.toBottom, control: [cx - 90 - column * 10, 326 + column * 2], to: top },
+    back: { from: bottom, control: [(cx + 360) / 2, 594 + column * 4], to: NAPS_PORTS.fromBottom },
   }
 }
 

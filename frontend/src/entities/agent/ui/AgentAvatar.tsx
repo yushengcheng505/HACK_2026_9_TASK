@@ -94,10 +94,10 @@ const MINIS: Record<AgentId, ReactNode> = {
     <>
       <Head fill={palette.keyCap} stroke={palette.brand} />
       <Eyes ink={palette.brand} />
-      <path d="M38 32 L46.5 15.5" stroke={palette.fg} strokeWidth="1.8" {...line} />
-      <path d="M45 32 L37 15.5" stroke={palette.fg} strokeWidth="1.8" {...line} />
-      <circle cx="37" cy="34.5" r="2.6" stroke={palette.brand} strokeWidth="1.4" fill={palette.keyCap} />
-      <circle cx="46" cy="34.5" r="2.6" stroke={palette.brand} strokeWidth="1.4" fill={palette.keyCap} />
+      <path d="M38.5 11.5 L42 28" stroke={palette.fgDim} strokeWidth="2" {...line} />
+      <rect x="38.4" y="27" width="7.2" height="2.8" rx="1" fill={palette.brandDeep} />
+      <path d="M38.6 29.6 L45.4 29.6 L47.6 38.6 L36.4 38.6 Z" fill={palette.brand} />
+      <path d="M40.2 31.5 L39.4 37 M42 31.5 L42 37 M43.8 31.5 L44.6 37" stroke={palette.brandDeep} strokeWidth="0.8" {...line} />
     </>
   ),
   skeptic: (
@@ -105,6 +105,7 @@ const MINIS: Record<AgentId, ReactNode> = {
       <Head fill={palette.fgDim} />
       <Eyes ink={palette.ink} squint />
       <path d="M14 18.5 Q18 15.5 22 17" stroke={palette.ink} strokeWidth="1.7" {...line} />
+      <path d="M27 21.5 L33.5 19" stroke={palette.ink} strokeWidth="1.7" {...line} />
       <text x="42" y="11" textAnchor="middle" fontFamily="Unbounded, sans-serif" fontWeight="700" fontSize="11" fill={palette.brand}>
         ?
       </text>

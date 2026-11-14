@@ -79,12 +79,6 @@
   font-weight: 700;
   text-anchor: middle;
 }
-.scene-code {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  font-weight: 700;
-  text-anchor: middle;
-}
 
 .scene-team {
   font-family: var(--font-mono);
@@ -92,6 +86,7 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  text-anchor: middle;
   fill: var(--color-fg-soft);
 }
 .scene-badge {
@@ -241,9 +236,6 @@
 .fx-beat-idle {
   animation: fx-beat-idle 2.4s ease-in-out infinite;
 }
-.fx-code {
-  animation: fx-code 0.9s steps(1) infinite;
-}
 .fx-ticket {
   animation: fx-ticket 1.35s ease-out infinite both;
 }
@@ -298,22 +290,16 @@
 }
 
 /* Упрощатель */
-.fx-snip-a {
-  animation: fx-snip-a 0.7s ease-in-out infinite;
+.fx-sweep {
+  animation: fx-sweep 0.8s ease-in-out infinite;
 }
-.fx-snip-b {
-  animation: fx-snip-b 0.7s ease-in-out infinite;
+.fx-sweep-idle {
+  animation: fx-sweep-idle 4.5s ease-in-out infinite;
 }
-.fx-snip-idle-a {
-  animation: fx-snip-idle-a 4s ease-in-out infinite;
-}
-.fx-snip-idle-b {
-  animation: fx-snip-idle-b 4s ease-in-out infinite;
-}
-.fx-crumb {
+.fx-dust {
   transform-box: fill-box;
   transform-origin: center;
-  animation: fx-crumb 1s ease-in infinite both;
+  animation: fx-dust 1.05s ease-out infinite both;
 }
 
 /* Скептик */
@@ -466,11 +452,6 @@
     transform: scale(1.05);
   }
 }
-@keyframes fx-code {
-  50% {
-    opacity: 0.3;
-  }
-}
 @keyframes fx-ticket {
   0% {
     opacity: 0;
@@ -549,55 +530,39 @@
     transform: scale(1.7);
   }
 }
-@keyframes fx-snip-a {
+@keyframes fx-sweep {
   0%,
   100% {
-    transform: rotate(0);
-  }
-  50% {
-    transform: rotate(-18deg);
-  }
-}
-@keyframes fx-snip-b {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  50% {
-    transform: rotate(18deg);
-  }
-}
-@keyframes fx-snip-idle-a {
-  0%,
-  80%,
-  100% {
-    transform: rotate(0);
-  }
-  88% {
     transform: rotate(-10deg);
   }
-}
-@keyframes fx-snip-idle-b {
-  0%,
-  80%,
-  100% {
-    transform: rotate(0);
-  }
-  88% {
+  50% {
     transform: rotate(10deg);
   }
 }
-@keyframes fx-crumb {
+@keyframes fx-sweep-idle {
+  0%,
+  80%,
+  100% {
+    transform: rotate(0);
+  }
+  86% {
+    transform: rotate(5deg);
+  }
+  92% {
+    transform: rotate(-3deg);
+  }
+}
+@keyframes fx-dust {
   0% {
     opacity: 0;
-    transform: translate(0, 0) rotate(0);
+    transform: translate(0, 0) scale(0.6);
   }
-  15% {
-    opacity: 1;
+  20% {
+    opacity: 0.9;
   }
   100% {
     opacity: 0;
-    transform: translate(16px, 48px) rotate(140deg);
+    transform: translate(-8px, -26px) scale(1.5);
   }
 }
 @keyframes fx-doubt-shake {
@@ -665,7 +630,6 @@
   .fx-write,
   .fx-beat,
   .fx-beat-idle,
-  .fx-code,
   .fx-ticket,
   .fx-board-idle,
   .fx-board-work,
@@ -673,11 +637,9 @@
   .fx-join-left,
   .fx-join-right,
   .fx-spark,
-  .fx-snip-a,
-  .fx-snip-b,
-  .fx-snip-idle-a,
-  .fx-snip-idle-b,
-  .fx-crumb,
+  .fx-sweep,
+  .fx-sweep-idle,
+  .fx-dust,
   .fx-doubt-shake,
   .fx-brow,
   .fx-brow-idle,
