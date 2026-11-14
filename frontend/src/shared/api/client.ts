@@ -32,6 +32,7 @@ export const api = {
     }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   form: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 }
 

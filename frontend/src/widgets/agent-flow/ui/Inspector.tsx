@@ -42,7 +42,7 @@ function Panel({ title, onBack, children }: { title: string; onBack?: () => void
 }
 
 function Overview({ view, instances, onSelect }: { view: RunView; instances: AgentInstance[]; onSelect: (k: string) => void }) {
-  const order = { working: 0, waiting: 1, queued: 2 } as Record<string, number>
+  const order = { working: 0, waiting: 1, paused: 1, queued: 2 } as Record<string, number>
   const busy = instances.filter((i) => i.status in order).sort((a, b) => order[a.status] - order[b.status])
   const tasksTarget = view.stories[0] ? `tasks:${view.stories[0].id}` : 'stories'
 

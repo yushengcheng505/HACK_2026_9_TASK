@@ -4,7 +4,7 @@ export type SourceKind = 'epic' | 'doc' | 'proto_rpc' | 'proto_message' | 'opena
 export type TaskType = 'backend' | 'frontend' | 'integration' | 'db' | 'qa' | 'devops'
 export type RequirementType = 'functional' | 'integration' | 'nonfunctional'
 export type Severity = 'error' | 'warning' | 'info'
-export type RunStatus = 'running' | 'waiting_answers' | 'done' | 'failed'
+export type RunStatus = 'running' | 'waiting_answers' | 'paused' | 'done' | 'failed'
 
 export interface SourceRef {
   id: string
@@ -149,6 +149,7 @@ export interface RunRecord {
   created_at: number
   updated_at?: number
   model: string | null
+  concurrency?: number | null
   error?: string | null
   questions?: Question[] | null
   result?: Decomposition | null
@@ -228,6 +229,8 @@ export interface RunView {
   runId: string
   title: string
   model: string
+  /** Сколько запросов к модели прогон шлёт одновременно; null — неизвестно (старые прогоны). */
+  concurrency: number | null
   status: RunStatus
   startedAt: number | null
   finishedAt: number | null

@@ -95,6 +95,7 @@ export function emptyRun(runId: string): RunView {
     runId,
     title: '',
     model: '',
+    concurrency: null,
     status: 'running',
     startedAt: null,
     finishedAt: null,
@@ -158,6 +159,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         title: epic.title,
         model: (d.model as string) ?? '',
+        concurrency: (d.concurrency as number | undefined) ?? null,
         startedAt: view.startedAt ?? e.receivedAt,
         status: 'running',
         log: pushLog(view, line(e, `Запуск ${d.run_id as string} · модель ${(d.model as string) ?? '—'}`, 'brand')),
@@ -170,7 +172,8 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         activeNode: node,
         taskTargets: node === 'tasks' ? ((d.stories as string[] | undefined) ?? []) : view.taskTargets,
-        nodes: setNode(view, node, { phase: 'active', visits: view.nodes[node].visits + 1 }),
+        // Узел уже активен — его перезапустили после паузы: это тот же заход, а не новый.
+        nodes: setNode(view, node, { phase: 'active', visits: view.nodes[node].visits + (view.nodes[node].phase === 'active' ? 0 : 1) }),
         log: pushLog(view, line(e, `>>> ${d.label as string}`, 'fg')),
       }
     }
@@ -218,6 +221,21 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
       const g = d.gap as Gap
       return { ...next, gaps: [...view.gaps, g], log: pushLog(view, line(e, `${g.id} ${g.text}`, 'hazard')) }
     }
+    case 'run_paused':
+      return { ...next, status: 'paused', log: pushLog(view, line(e, 'Пауза: прогон остановлен, состояние сохранено', 'amber')) }
+    case 'run_resumed':
+      return {
+        ...next,
+        status: 'running',
+        concurrency: (d.concurrency as number | undefined) ?? view.concurrency,
+        log: pushLog(view, line(e, 'Продолжение с последнего сохранённого шага', 'brand')),
+      }
+    case 'concurrency_changed':
+      return {
+        ...next,
+        concurrency: d.concurrency as number,
+        log: pushLog(view, line(e, `Параллельных запросов к модели: ${d.concurrency as number}`)),
+      }
     case 'questions_asked':
       return { ...next, questions: d.questions as Question[] }
     case 'waiting_answers':

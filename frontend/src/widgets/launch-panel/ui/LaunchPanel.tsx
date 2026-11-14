@@ -5,6 +5,8 @@ import { navigate } from '@/shared/lib/useHashRoute'
 import { LOCAL_TEMPLATES, unwrap } from '../model/templates'
 import type { EpicTemplate } from '../model/templates'
 import { CustomEpicForm } from './CustomEpicForm'
+import { useModelChoice } from '../model/useModelChoice'
+import { ModelPicker } from './ModelPicker'
 import type { EpicDraft } from './CustomEpicForm'
 import { TeamCrew } from './TeamCrew'
 import { TemplateCard } from './TemplateCard'
@@ -29,6 +31,7 @@ export function LaunchPanel() {
   /** Что сейчас запускается: id демо-эпика или CUSTOM. */
   const [launching, setLaunching] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { providers, choice, change, concurrency, changeConcurrency } = useModelChoice()
 
   useEffect(() => {
     listDemos()
@@ -53,7 +56,7 @@ export function LaunchPanel() {
 
   const launchCustom = (files: Record<InputRole, File[]>) =>
     launch(CUSTOM, () =>
-      startCustom({ title: draft.title.trim() || 'Эпик без названия', text: draft.text, skipQuestions: skip, files }),
+      startCustom({ title: draft.title.trim() || 'Эпик без названия', text: draft.text, skipQuestions: skip, files, model: choice, concurrency }),
     )
 
   const take = (template: EpicTemplate) => {
@@ -73,10 +76,19 @@ export function LaunchPanel() {
           <br />
           <span className="text-brand">Команда уже на месте.</span>
         </h1>
-        <p className="m-0 max-w-[380px] text-[14px] leading-[1.6] text-fg-muted">
-          Опишите эпик слева или возьмите готовый шаблон справа. Агенты разложат его на требования, истории и задачи,
-          а каждую задачу свяжут с источником.
-        </p>
+        <div className="flex flex-col items-start gap-3">
+          <p className="m-0 max-w-[380px] text-[14px] leading-[1.6] text-fg-muted">
+            Опишите эпик слева или возьмите готовый шаблон справа. Агенты разложат его на требования, истории и задачи,
+            а каждую задачу свяжут с источником.
+          </p>
+          <ModelPicker
+            providers={providers}
+            choice={choice}
+            onChange={change}
+            concurrency={concurrency}
+            onConcurrencyChange={changeConcurrency}
+          />
+        </div>
       </header>
 
       {error && (
@@ -126,7 +138,7 @@ export function LaunchPanel() {
                   launching={launching === template.id}
                   disabled={launching !== null}
                   onTake={() => take(template)}
-                  onLaunch={demo ? () => launch(demo.id, () => startDemo(demo.id, skip)) : undefined}
+                  onLaunch={demo ? () => launch(demo.id, () => startDemo(demo.id, skip, choice, concurrency)) : undefined}
                 />
               ))}
             </div>

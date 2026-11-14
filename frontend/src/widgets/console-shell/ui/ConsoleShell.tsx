@@ -15,6 +15,9 @@ interface ConsoleShellProps {
 const NAV: { route: ConsoleRoute; index: string; label: string }[] = [
   { route: { name: 'launch' }, index: '01', label: 'Новый запуск' },
   { route: { name: 'runs' }, index: '02', label: 'Запуски' },
+  { route: { name: 'models' }, index: '03', label: 'Модели' },
+  { route: { name: 'prompts' }, index: '04', label: 'Промпты' },
+  { route: { name: 'bench' }, index: '05', label: 'Бенчмарк' },
 ]
 
 export function ConsoleShell({ route, bare = false, children }: ConsoleShellProps) {

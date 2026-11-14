@@ -65,6 +65,30 @@
   }
 }
 
+/* Пауза / продолжить: одна кнопка в стиле сегмента */
+.af-control {
+  padding: 6px 13px;
+  color: #f4b942;
+  white-space: nowrap;
+}
+.af-control-resume {
+  color: #020e0e;
+  background: #01de82;
+  box-shadow: none;
+}
+.af-control-error {
+  box-shadow: inset 0 0 0 1px #ff5a4e;
+}
+@media (hover: hover) and (pointer: fine) {
+  .af-control:not(:disabled):not(.af-control-resume):hover {
+    color: #e6fff3;
+    background: #2a1f08;
+  }
+  .af-control-resume:not(:disabled):hover {
+    background: #3bf0a2;
+  }
+}
+
 /* ---------- подготовка ---------- */
 
 .af-prep {
@@ -411,7 +435,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  padding: 0 8px 12px;
+  padding: 0 6px 12px;
 }
 .af-card-name {
   font: 700 12.5px Manrope, sans-serif;
@@ -422,7 +446,7 @@
 .af-card-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   max-width: 100%;
   padding: 3px 6px;
   overflow: hidden;
@@ -520,12 +544,14 @@
 .af-status-done .af-dot {
   background: #9df7cf;
 }
-.af-status-waiting {
+.af-status-waiting,
+.af-status-paused {
   box-shadow:
     inset 0 0 0 1.5px #f4b942,
     0 0 0 4px rgb(244 185 66 / 0.1);
 }
-.af-status-waiting .af-dot {
+.af-status-waiting .af-dot,
+.af-status-paused .af-dot {
   background: #f4b942;
 }
 .af-status-failed {

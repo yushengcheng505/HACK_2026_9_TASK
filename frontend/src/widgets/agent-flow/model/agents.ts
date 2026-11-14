@@ -3,7 +3,7 @@ import type { AgentId } from '@/entities/agent'
 import type { RunView, StreamRun } from '@/entities/run'
 
 /** queued — вызван, но ещё не начал отвечать; waiting — ждёт человека. */
-export type AgentStatus = 'idle' | 'queued' | 'working' | 'done' | 'waiting' | 'failed'
+export type AgentStatus = 'idle' | 'queued' | 'working' | 'done' | 'waiting' | 'paused' | 'failed'
 
 export interface AgentInstance {
   /** Ключ экземпляра: `requirements`, `tasks:US-001`, `review:US-001`, `skeptic`… */
@@ -58,7 +58,8 @@ function reviewTargets(view: RunView): Set<string> {
 /** Статус по вызову в текущем круге: пишет, закончил или ещё в очереди. */
 function byCall(view: RunView, keys: string[], round: number, now: number, targeted: boolean): AgentStatus {
   const run = lastRun(view, keys)
-  if (run && run.round === round) return now - run.lastAt < LIVE_MS ? 'working' : 'done'
+  // На паузе часы графа стоят, поэтому «писал в момент паузы» сохраняется — такой агент ждёт продолжения.
+  if (run && run.round === round) return now - run.lastAt < LIVE_MS ? (view.status === 'paused' ? 'paused' : 'working') : 'done'
   if (failureOf(view, keys)) return 'failed'
   return targeted ? 'queued' : run ? 'done' : 'idle'
 }
@@ -66,7 +67,7 @@ function byCall(view: RunView, keys: string[], round: number, now: number, targe
 function single(view: RunView, kind: 'requirements' | 'analyst' | 'stories'): AgentStatus {
   const phase = view.nodes[kind].phase
   if (kind === 'analyst' && view.waitingAnswers) return 'waiting'
-  if (phase === 'active') return view.status === 'failed' ? 'failed' : 'working'
+  if (phase === 'active') return view.status === 'failed' ? 'failed' : view.status === 'paused' ? 'paused' : 'working'
   if (phase === 'done') return 'done'
   return 'idle'
 }
@@ -118,7 +119,17 @@ export function buildInstances(view: RunView, now: number): AgentInstance[] {
   const skepticKeys = ['skeptic:gaps', 'skeptic', 'critic']
   const run = lastRun(view, skepticKeys)
   const skepticLive = run && now - run.lastAt < LIVE_MS && (view.activeNode === 'analyst' || view.activeNode === 'critic')
-  add('skeptic', 'skeptic', skepticLive ? 'working' : failureOf(view, skepticKeys) ? 'failed' : run ? 'done' : 'idle', skepticKeys)
+  // Скептик проверяет и пробелы аналитика, и каждый круг проверки, — «готово» только когда весь прогон завершён.
+  const skeptic: AgentStatus = skepticLive
+    ? view.status === 'paused'
+      ? 'paused'
+      : 'working'
+    : failureOf(view, skepticKeys)
+      ? 'failed'
+      : run && view.status === 'done'
+        ? 'done'
+        : 'idle'
+  add('skeptic', 'skeptic', skeptic, skepticKeys)
 
   return out
 }
@@ -129,5 +140,6 @@ export const STATUS_LABEL: Record<AgentStatus, string> = {
   working: 'работает',
   done: 'готово',
   waiting: 'ждёт ответов',
+  paused: 'на паузе',
   failed: 'сбой',
 }

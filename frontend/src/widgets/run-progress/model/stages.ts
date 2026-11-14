@@ -37,7 +37,7 @@ const summaries = (view: RunView, nodes: PipelineNode[]) =>
 function phaseOf(view: RunView, id: StageId, reached: number): NodePhase {
   if (view.status === 'done') return 'done'
   const phases = NODES[id].map((n) => view.nodes[n].phase)
-  if (phases.includes('waiting')) return 'waiting'
+  if (phases.includes('waiting') || (view.status === 'paused' && phases.includes('active'))) return 'waiting'
   if (phases.includes('active')) return 'active'
   if (ORDER.indexOf(id) < reached || (phases.includes('done') && !phases.includes('idle'))) return 'done'
   return phases.includes('done') ? 'active' : 'idle'

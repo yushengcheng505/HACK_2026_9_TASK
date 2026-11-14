@@ -1,13 +1,20 @@
-/** Геометрия графа агентов в пикселях контейнера: колонки слева направо, по ряду на историю. */
+/**
+ * Геометрия графа агентов в пикселях «мира»: колонки слева направо, по ряду на историю.
+ * Расстояния фиксированные и не зависят от размера окна — под экран граф подгоняет только масштаб,
+ * поэтому на любом разрешении и масштабе браузера узлы стоят одинаково и не наезжают друг на друга.
+ */
 
-export const CARD = { w: 128, h: 150 } as const
+export const CARD = { w: 144, h: 150 } as const
 export const CHIP = { w: 150, h: 48 } as const
 export const GATE = { w: 30 } as const
 export const RESULT = { w: 132, h: 150 } as const
 
 const PAD = { left: 28, right: 28, top: 64, bottom: 76 } as const
-/** Относительные промежутки между центрами колонок. */
-const GAPS = [1, 1, 1.1, 0.6, 0.6, 1.45, 1.15, 1] as const
+/**
+ * Расстояния между центрами соседних колонок. Между генераторами задач и ОТК — место под границу
+ * двух групп, между рецензентами и Редактором стыков — под шину находок.
+ */
+const GAPS = [188, 188, 214, 124, 120, 224, 198, 198] as const
 /** Коридор между Редактором стыков и Упрощателем: через него шина находок идёт к Скептику. */
 const CORRIDOR = 56
 
@@ -74,15 +81,20 @@ function curve(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 
-export function layoutFlow(width: number, height: number, storyIds: string[]): FlowLayout {
-  const first = PAD.left + CARD.w / 2
-  const last = width - PAD.right - RESULT.w / 2
-  const total = GAPS.reduce((a, b) => a + b, 0)
+/** Ширина мира: от левого края карточки Составителя до правого края Итога. */
+export const FLOW_WIDTH = PAD.left + CARD.w / 2 + GAPS.reduce((a, b) => a + b, 0) + RESULT.w / 2 + PAD.right
+
+/** Высота мира: растёт с числом историй. */
+export const flowHeight = (stories: number) => Math.max(stories * 62 + 330, 600)
+
+export function layoutFlow(storyIds: string[]): FlowLayout {
+  const width = FLOW_WIDTH
+  const height = flowHeight(storyIds.length)
   const col = {} as Record<Column, number>
-  let acc = 0
+  let x = PAD.left + CARD.w / 2
   COLUMNS.forEach((c, i) => {
-    col[c] = first + ((last - first) * acc) / total
-    if (i < GAPS.length) acc += GAPS[i]
+    col[c] = x
+    if (i < GAPS.length) x += GAPS[i]
   })
 
   const areaTop = PAD.top

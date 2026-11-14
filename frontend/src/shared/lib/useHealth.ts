@@ -6,6 +6,8 @@ export interface Health {
   model: string
   llm_host: string
   json_mode: string
+  /** Параллельность по умолчанию из backend/.env. */
+  concurrency: number
 }
 
 const LOCAL_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1|[\w-]+(:\d+)?$)/

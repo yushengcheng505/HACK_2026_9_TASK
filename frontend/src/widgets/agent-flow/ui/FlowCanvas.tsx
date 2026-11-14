@@ -4,7 +4,7 @@ import type { RunView } from '@/entities/run'
 import { isLegacyReview } from '../model/agents'
 import type { AgentInstance, AgentStatus } from '../model/agents'
 import { metaFor } from '../model/meta'
-import { CHIP, layoutFlow } from '../model/layout'
+import { CHIP, FLOW_WIDTH, flowHeight, layoutFlow } from '../model/layout'
 import type { Edge, FlowLayout } from '../model/layout'
 import type { ParticleApi } from '../model/particles'
 import { usePanZoom } from '../model/usePanZoom'
@@ -103,8 +103,8 @@ export function FlowCanvas({ view, instances, selected, onSelect, particles, liv
   const { ref: viewport, w, h } = useSize()
   const worldRef = useRef<HTMLDivElement>(null)
   const storyIds = useMemo(() => view.stories.map((s) => s.id), [view.stories])
-  const world = useMemo(() => ({ w: Math.max(w, 1400), h: Math.max(h, storyIds.length * 62 + 330, 600) }), [w, h, storyIds.length])
-  const layout = useMemo(() => (w && h ? layoutFlow(world.w, world.h, storyIds) : null), [w, h, world, storyIds])
+  const world = useMemo(() => ({ w: FLOW_WIDTH, h: flowHeight(storyIds.length) }), [storyIds.length])
+  const layout = useMemo(() => (w && h ? layoutFlow(storyIds) : null), [w, h, storyIds])
   const byKey = useMemo(() => new Map(instances.map((i) => [i.key, i])), [instances])
   const pz = usePanZoom(viewport, world, { w, h })
   const spawn = useSpawn(layout, worldRef, particles)

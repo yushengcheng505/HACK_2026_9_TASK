@@ -9,6 +9,7 @@ const EVENT_TYPES = [
   'story_created', 'tasks_replaced', 'task_created', 'checks_finished', 'critic_feedback',
   'run_finished', 'run_failed', 'result_edited', 'tasks_failed', 'llm_retry',
   'findings_collected', 'findings_judged', 'findings_resolution', 'tasks_removed', 'review_skipped',
+  'run_paused', 'run_resumed', 'concurrency_changed',
 ] as const
 
 const TERMINAL = new Set(['run_finished', 'run_failed'])

@@ -1,5 +1,11 @@
 import { api } from '@/shared/api'
 
+/** Модель для запуска: провайдер и модель; без выбора — модель сервера. */
+export interface LaunchModel {
+  providerId: string
+  model: string
+}
+
 export type InputRole = 'product_docs' | 'external_docs' | 'contracts' | 'examples'
 
 export interface DemoEpic {
@@ -19,19 +25,32 @@ export const ROLE_LABELS: Record<InputRole, { label: string; hint: string; accep
 
 export const listDemos = () => api.get<DemoEpic[]>('/demos')
 
-export const startDemo = (demoId: string, skipQuestions: boolean) =>
-  api.post<{ run_id: string }>(`/demos/${demoId}/run`, { skip_questions: skipQuestions })
+export const startDemo = (demoId: string, skipQuestions: boolean, model?: LaunchModel | null, concurrency?: number | null) =>
+  api.post<{ run_id: string }>(`/demos/${demoId}/run`, {
+    skip_questions: skipQuestions,
+    provider_id: model?.providerId ?? null,
+    model: model?.model || null,
+    concurrency: concurrency ?? null,
+  })
 
 export function startCustom(input: {
   title: string
   text: string
   skipQuestions: boolean
   files: Record<InputRole, File[]>
+  model?: LaunchModel | null
+  /** Сколько запросов к модели одновременно; без значения — LLM_CONCURRENCY сервера. */
+  concurrency?: number | null
 }) {
   const form = new FormData()
   form.set('title', input.title)
   form.set('text', input.text)
   form.set('skip_questions', String(input.skipQuestions))
+  if (input.model) {
+    form.set('provider_id', input.model.providerId)
+    if (input.model.model) form.set('model', input.model.model)
+  }
+  if (input.concurrency) form.set('concurrency', String(input.concurrency))
   for (const [role, files] of Object.entries(input.files)) {
     for (const file of files) form.append(role, file)
   }

@@ -23,9 +23,10 @@ export function metaFor(inst: AgentInstance, view: RunView): string {
       return view.calls[inst.key] ? `${n} ${plural(n, 'находка', 'находки', 'находок')}` : ''
     }
     case 'junction':
-      return view.calls.junction ? `${own('editor').length} находок` : ''
-    case 'simplifier':
-      return view.calls.simplifier ? `${own('simplifier').length} находок` : ''
+    case 'simplifier': {
+      const n = own(inst.kind === 'junction' ? 'editor' : 'simplifier').length
+      return view.calls[inst.kind] ? `${n} ${plural(n, 'находка', 'находки', 'находок')}` : ''
+    }
     case 'skeptic': {
       const r = view.review
       return r.confirmed + r.rejected + r.downgraded ? `✓${r.confirmed} ↓${r.downgraded} ✗${r.rejected}` : ''

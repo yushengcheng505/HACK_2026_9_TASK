@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import { STATUS_LABEL } from '@/entities/run'
 import type { RunView } from '@/entities/run'
+import { pauseRun, resumeRun } from '@/features/run-control'
 import { exportUrl } from '@/shared/api'
 import { useElapsed } from '@/shared/lib/useElapsed'
 import { routeHref } from '@/shared/lib/useHashRoute'
 import { BrandName } from '@/shared/ui/BrandName'
 import { LogoMark } from '@/shared/ui/LogoMark'
 import type { RunMode } from '@/shared/lib/useHashRoute'
+import { ConcurrencyControl } from './ConcurrencyControl'
 import '../flow.css'
 
 const SPEEDS = [4, 10, 25] as const
@@ -28,7 +31,22 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
   const elapsed = useElapsed(view.startedAt, view.finishedAt)
   const status = STATUS_LABEL[view.status]
   const ready = view.status === 'done'
-  const canReplay = view.status !== 'running' || replay
+  const canReplay = (view.status !== 'running' && view.status !== 'paused') || replay
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const control = view.status === 'running' ? 'pause' : view.status === 'paused' ? 'resume' : null
+
+  const toggle = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await (control === 'pause' ? pauseRun : resumeRun)(view.runId)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <header className="af-header flex items-center gap-6 px-5">
@@ -65,6 +83,22 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
         <span className="font-mono text-[11px] tracking-[0.1em] uppercase">{status.text}</span>
         <output className="ml-1 font-mono text-[14px] text-fg tabular-nums">{elapsed}</output>
       </div>
+
+      {view.status !== 'done' && view.status !== 'failed' && view.concurrency !== null && !replay && (
+        <ConcurrencyControl runId={view.runId} value={view.concurrency} />
+      )}
+
+      {control && !replay && (
+        <button
+          type="button"
+          onClick={() => void toggle()}
+          disabled={busy}
+          title={error ?? (control === 'pause' ? 'Остановить прогон; продолжится с последнего сохранённого шага' : 'Продолжить прогон')}
+          className={`af-seg af-seg-item af-control ${control === 'resume' ? 'af-control-resume' : ''} ${error ? 'af-control-error' : ''}`}
+        >
+          {control === 'pause' ? '❚❚ Пауза' : '▶ Продолжить'}
+        </button>
+      )}
 
       <div className="af-seg" role="group" aria-label="Воспроизвести запись прогона">
         <span className="af-seg-cap">▶ запись</span>

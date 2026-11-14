@@ -8,6 +8,7 @@ const STATE: Record<AgentStatus, AgentState> = {
   working: 'working',
   done: 'done',
   waiting: 'waiting',
+  paused: 'waiting',
   failed: 'waiting',
 }
 
