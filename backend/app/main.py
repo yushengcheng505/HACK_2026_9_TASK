@@ -229,6 +229,17 @@ def create_app(llm: LLM | None = None, tracker: Tracker | None = None,
         return [{"id": d.id, "title": d.title, "summary": d.summary, "epic_text": d.epic_text,
                  "files": [{"name": f.name, "role": f.role} for f in d.files]} for d in list_demos()]
 
+    @app.get("/api/demos/{demo_id}/files/{name}")
+    def demo_file(demo_id: str, name: str, download: bool = False):
+        if demo_id not in {d.id for d in list_demos()}:
+            raise HTTPException(404, "Демо не найдено")
+        demo = load_demo(demo_id)
+        file = next((file for file in demo.files if file.name == name), None)
+        if file is None:
+            raise HTTPException(404, "Файл не найден")
+        headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(file.name)}"} if download else {}
+        return Response(file.content, media_type="text/plain; charset=utf-8", headers=headers)
+
     @app.get("/api/demos/{demo_id}/reference")
     def demo_reference(demo_id: str):
         if demo_id not in {d.id for d in list_demos()}:

@@ -11,11 +11,12 @@ interface TemplateCardProps {
   launching: boolean
   disabled: boolean
   onTake: () => void
+  onDocuments?: (name: string) => void
   /** Запуск целиком, вместе с документами и контрактами. */
   onLaunch?: () => void
 }
 
-export function TemplateCard({ template, files, inForm, launching, disabled, onTake, onLaunch }: TemplateCardProps) {
+export function TemplateCard({ template, files, inForm, launching, disabled, onTake, onLaunch, onDocuments }: TemplateCardProps) {
   return (
     <article
       className={`fx-enter flex flex-col gap-4 rounded-[22px] border bg-panel p-5 transition-colors duration-200 ${
@@ -44,15 +45,22 @@ export function TemplateCard({ template, files, inForm, launching, disabled, onT
       {files && files.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {files.map((file) => (
-            <span key={file.name} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-ink px-2.5 py-1">
+            <button type="button" key={file.name} onClick={() => onDocuments?.(file.name)}
+              className="press inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border border-line-strong bg-ink px-2.5 py-1 hover:border-brand">
               <span className="font-mono text-[10px] font-bold tracking-wider text-brand">{fileKind(file.name)}</span>
-              <span className="font-mono text-[12px] text-fg-soft">{file.name}</span>
-            </span>
+              <span className="truncate font-mono text-[12px] text-fg-soft">{file.name}</span>
+            </button>
           ))}
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-2.5">
+        {onDocuments && files?.[0] && (
+          <button type="button" onClick={() => onDocuments(files[0].name)}
+            className="press inline-flex min-h-9 cursor-pointer items-center rounded-full border border-line-strong px-3 font-mono text-[12px] text-fg-muted hover:border-brand hover:text-brand">
+            Документы
+          </button>
+        )}
         {onLaunch && (
           <button
             type="button"

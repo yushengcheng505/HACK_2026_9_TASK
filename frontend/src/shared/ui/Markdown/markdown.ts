@@ -8,7 +8,6 @@ export type Block =
 const LIST = /^(?:[-*]|\d+\.)\s+/
 const cells = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
 
-/** Разбор подмножества markdown из отчётов бенчмарка: заголовки, абзацы, списки, pipe-таблицы. */
 export function parse(source: string): Block[] {
   const blocks: Block[] = []
   const lines = source.split('\n')

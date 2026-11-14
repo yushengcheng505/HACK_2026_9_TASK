@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { ModelPicker, useModelChoice } from '@/features/choose-model'
 import { BrandName } from '@/shared/ui/BrandName'
 import { LogoMark } from '@/shared/ui/LogoMark'
 import { isClosedContour, useHealth } from '@/shared/lib/useHealth'
@@ -23,9 +24,16 @@ const NAV: { route: ConsoleRoute; index: string; label: string }[] = [
 
 export function ConsoleShell({ route, bare = false, children }: ConsoleShellProps) {
   const health = useHealth()
+  const { providers, choice } = useModelChoice()
+  const provider = providers?.find((p) => p.id === choice?.providerId)
+  let host = ''
+  if (provider?.base_url) {
+    try { host = new URL(provider.base_url).host } catch { /* Некорректный адрес не считается локальным. */ }
+  }
+  if (!host && provider?.builtin && health && health !== 'offline') host = health.llm_host
   return (
     <div className={`bp-grid grid h-full ${bare ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[216px_minmax(0,1fr)]'}`}>
-      <aside className={`${bare ? 'hidden' : 'flex'} min-h-0 flex-col border-r border-line bg-ink/90`}>
+      <aside className={`${bare ? 'hidden' : 'flex'} min-h-0 flex-col overflow-y-auto border-r border-line bg-ink/90`}>
         <a href="/" className="flex items-center gap-3 border-b border-line px-4 py-4" title="На лендинг">
           <LogoMark />
           <span className="flex flex-col">
@@ -53,44 +61,40 @@ export function ConsoleShell({ route, bare = false, children }: ConsoleShellProp
           })}
         </nav>
 
-        <div className="mt-auto border-t border-line p-4">
-          <div className="tag mb-3 text-fg-dim">[ Модель ]</div>
-          {health === null && <div className="tag text-fg-dim">опрос…</div>}
-          {health === 'offline' && (
-            <div className="flex items-center gap-2">
-              <span className="size-2 bg-hazard" />
-              <span className="tag text-hazard">Бэкенд недоступен</span>
-            </div>
-          )}
-          {health && health !== 'offline' && (
-            <dl className="flex flex-col gap-2">
-              <div>
-                <dt className="tag text-fg-dim">Модель</dt>
-                <dd className="truncate font-mono text-[12px] text-fg" title={health.model}>
-                  {health.model}
-                </dd>
+        <div className="mt-auto shrink-0 border-t border-line p-4">
+          {!bare && <ModelPicker />}
+          <div className="mt-4">
+            {health === null && <div className="tag text-fg-dim">опрос…</div>}
+            {health === 'offline' && (
+              <div className="flex items-center gap-2">
+                <span className="size-2 bg-hazard" />
+                <span className="tag text-hazard">Бэкенд недоступен</span>
               </div>
-              <div>
-                <dt className="tag text-fg-dim">Хост</dt>
-                <dd className="truncate font-mono text-[12px] text-fg-soft" title={health.llm_host}>
-                  {health.llm_host}
-                </dd>
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                {isClosedContour(health.llm_host) ? (
-                  <>
-                    <span className="fx-pulse size-2 rounded-full bg-brand" />
-                    <span className="tag text-brand">Замкнутый контур</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="size-2 rounded-full bg-amber" />
-                    <span className="tag text-amber">Внешний хост</span>
-                  </>
-                )}
-              </div>
-            </dl>
-          )}
+            )}
+            {health && health !== 'offline' && (
+              <dl className="flex flex-col gap-2">
+                <div>
+                  <dt className="tag text-fg-dim">Хост</dt>
+                  <dd className="truncate font-mono text-[12px] text-fg-soft" title={host}>
+                    {host || '—'}
+                  </dd>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  {isClosedContour(host) ? (
+                    <>
+                      <span className="fx-pulse size-2 rounded-full bg-brand" />
+                      <span className="tag text-brand">Замкнутый контур</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="size-2 rounded-full bg-amber" />
+                      <span className="tag text-amber">Внешний хост</span>
+                    </>
+                  )}
+                </div>
+              </dl>
+            )}
+          </div>
         </div>
       </aside>
 

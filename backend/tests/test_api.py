@@ -52,6 +52,32 @@ def test_health_and_demos(client):
     assert any(f["name"] == "courier.proto" for f in demos[0]["files"])
 
 
+def test_demo_file_content(client):
+    response = client.get("/api/demos/boutique-delivery/files/courier.proto")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/plain; charset=utf-8"
+    assert response.text.startswith('syntax = "proto3";')
+    assert "service CourierService" in response.text
+    assert "Content-Disposition" not in response.headers
+
+
+@pytest.mark.parametrize("path", [
+    "boutique-delivery/files/missing.proto",
+    "boutique-delivery/files/%2E%2E%2Fdemo.json",
+    "missing/files/courier.proto",
+    "%2E%2E/files/courier.proto",
+])
+def test_demo_file_unknown_or_traversal(client, path):
+    assert client.get(f"/api/demos/{path}").status_code == 404
+
+
+def test_demo_file_download(client):
+    response = client.get("/api/demos/boutique-delivery/files/courier.proto?download=1")
+    assert response.status_code == 200
+    assert response.headers["content-disposition"] == "attachment; filename*=UTF-8''courier.proto"
+    assert response.text.startswith('syntax = "proto3";')
+
+
 def test_demo_run_to_exports(client):
     run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
     run = wait_status(client, run_id, ("done", "failed"))

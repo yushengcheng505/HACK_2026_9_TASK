@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import type { Provider, ProviderInput } from '@/features/manage-providers'
 import { JSON_MODES, createProvider, deleteProvider, listModels, listProviders, updateProvider } from '@/features/manage-providers'
 import { AgentAvatar, ROSTER } from '@/entities/agent'
+import { reloadProviders } from '@/features/choose-model'
 
 const NEW = 'new'
 
@@ -88,6 +89,7 @@ export function ModelsPanel() {
     try {
       const body = { ...form, api_key_env: form.api_key_env?.trim() || null, default_model: form.default_model?.trim() || null }
       const saved = current && !current.builtin ? await updateProvider(current.id, body) : await createProvider(body)
+      await reloadProviders()
       await load(saved.id)
     } catch (e) {
       setError((e as Error).message)
@@ -101,6 +103,7 @@ export function ModelsPanel() {
     setError(null)
     try {
       await deleteProvider(current.id)
+      await reloadProviders()
       await load('env')
     } catch (e) {
       setError((e as Error).message)
@@ -123,7 +126,7 @@ export function ModelsPanel() {
         </h1>
         <div className="flex flex-col items-start gap-3">
           <p className="m-0 max-w-[380px] text-[14px] leading-[1.6] text-fg-muted">
-            Любой OpenAI-совместимый API. Модель выбирается на экране запуска и записывается в прогон.
+            Любой OpenAI-совместимый API. Модель выбирается в боковой панели и записывается в прогон.
           </p>
           <div className="flex items-center gap-1" aria-hidden="true">
             {ROSTER.map((agent) => (

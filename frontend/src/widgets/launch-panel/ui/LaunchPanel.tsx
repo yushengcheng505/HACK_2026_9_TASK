@@ -5,11 +5,11 @@ import { navigate } from '@/shared/lib/useHashRoute'
 import { LOCAL_TEMPLATES, unwrap } from '../model/templates'
 import type { EpicTemplate } from '../model/templates'
 import { CustomEpicForm } from './CustomEpicForm'
-import { useModelChoice } from '../model/useModelChoice'
-import { ModelPicker } from './ModelPicker'
+import { useModelChoice } from '@/features/choose-model'
 import type { EpicDraft } from './CustomEpicForm'
 import { TeamCrew } from './TeamCrew'
 import { TemplateCard } from './TemplateCard'
+import { DemoDocuments } from './DemoDocuments'
 
 const CUSTOM = 'custom'
 
@@ -28,10 +28,11 @@ export function LaunchPanel() {
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<EpicDraft>({ title: '', text: '' })
   const [skip, setSkip] = useState(false)
+  const [documents, setDocuments] = useState<{ demo: DemoEpic; file: string } | null>(null)
   /** Что сейчас запускается: id демо-эпика или CUSTOM. */
   const [launching, setLaunching] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { providers, choice, change, concurrency, changeConcurrency } = useModelChoice()
+  const { choice, concurrency } = useModelChoice()
 
   useEffect(() => {
     listDemos()
@@ -76,19 +77,6 @@ export function LaunchPanel() {
           <br />
           <span className="text-brand">Команда уже на месте.</span>
         </h1>
-        <div className="flex flex-col items-start gap-3">
-          <p className="m-0 max-w-[380px] text-[14px] leading-[1.6] text-fg-muted">
-            Опишите эпик слева или возьмите готовый шаблон справа. Агенты разложат его на требования, истории и задачи,
-            а каждую задачу свяжут с источником.
-          </p>
-          <ModelPicker
-            providers={providers}
-            choice={choice}
-            onChange={change}
-            concurrency={concurrency}
-            onConcurrencyChange={changeConcurrency}
-          />
-        </div>
       </header>
 
       {error && (
@@ -138,6 +126,7 @@ export function LaunchPanel() {
                   launching={launching === template.id}
                   disabled={launching !== null}
                   onTake={() => take(template)}
+                  onDocuments={demo ? (file) => setDocuments({ demo, file }) : undefined}
                   onLaunch={demo ? () => launch(demo.id, () => startDemo(demo.id, skip, choice, concurrency)) : undefined}
                 />
               ))}
@@ -146,6 +135,7 @@ export function LaunchPanel() {
           </div>
         </section>
       </div>
+      {documents && <DemoDocuments demo={documents.demo} initialFile={documents.file} onClose={() => setDocuments(null)} />}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { headingId, parse } from '../model/markdown'
+import { headingId, parse } from './markdown'
 
 function inline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {

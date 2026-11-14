@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AGENTS, AgentAvatar } from '@/entities/agent'
 import { api } from '@/shared/api'
-import { outline } from '../model/markdown'
-import { Markdown } from './Markdown'
+import { Markdown, outline } from '@/shared/ui/Markdown'
 
 interface BenchReport {
   summary: { title: string; markdown: string } | null
