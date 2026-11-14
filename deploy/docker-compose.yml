@@ -30,8 +30,8 @@ services:
       - haproxy
 
   web:
-    build:
     restart: unless-stopped
+    build:
       context: ..
       dockerfile: frontend/Dockerfile
     ports:
