@@ -111,7 +111,7 @@ def score(d: Decomposition, items: list[AnalystItem], matches: list[LabMatch]) -
     recommendations += [f"Нет задачи на метод контракта {op}" for op in ops_missed]
     recommendations += [f"Нет интеграционного теста на метод {op} (у агента: {', '.join(test_tasks[op])})"
                         for op in tests_missed]
-    recommendations += [f"Уточнить: «{item.text}» — не следует из требований эпика"
+    recommendations += [f"Нет у агента: «{item.text}» — проверьте, нужен ли пункт эпику"
                         for item in items if item.id in analyst_only]
     denominator = sum(bool(ids) for ids in req_tasks.values())
     return LabResult(
