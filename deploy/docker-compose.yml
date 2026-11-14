@@ -1,6 +1,7 @@
 services:
   haproxy:
     image: haproxy:3.2-alpine
+    restart: unless-stopped
     env_file: .env
     volumes:
       - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
@@ -12,6 +13,7 @@ services:
 
   backend:
     build: ../backend
+    restart: unless-stopped
     env_file:
       - path: ../backend/.env
         required: false
@@ -29,6 +31,7 @@ services:
 
   web:
     build:
+    restart: unless-stopped
       context: ..
       dockerfile: frontend/Dockerfile
     ports:
