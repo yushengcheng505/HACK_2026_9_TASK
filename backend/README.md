@@ -74,6 +74,7 @@ curl -X POST localhost:8000/api/demos/boutique-delivery/run -H 'content-type: ap
 curl -N localhost:8000/api/runs/<run_id>/events          # живой поток событий
 curl -X POST localhost:8000/api/runs/<run_id>/answers -H 'content-type: application/json' -d '{"answers":{}}'
 curl -OJ localhost:8000/api/runs/<run_id>/export/docx    # json | xlsx | docx
+curl -OJ localhost:8000/api/runs/<run_id>/bundle         # ZIP: входы, промпты, шаги, события и результат; любой статус
 curl -N 'localhost:8000/api/runs/<run_id>/events?replay=1'  # проигрывание записанного прогона
 curl -X POST localhost:8000/api/runs/<run_id>/pause         # пауза; /resume — продолжить с контрольной точки
 curl -X PUT localhost:8000/api/runs/<run_id>/concurrency -H 'content-type: application/json' -d '{"value":4}'

@@ -3,7 +3,7 @@ import { STATUS_LABEL } from '@/entities/run'
 import type { RunView } from '@/entities/run'
 import { pauseRun, resumeRun } from '@/features/run-control'
 import { PublishButton } from '@/features/publish-tracker'
-import { exportUrl } from '@/shared/api'
+import { bundleUrl, exportUrl } from '@/shared/api'
 import { useElapsed } from '@/shared/lib/useElapsed'
 import { routeHref } from '@/shared/lib/useHashRoute'
 import { BrandName } from '@/shared/ui/BrandName'
@@ -32,6 +32,7 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
   const elapsed = useElapsed(view.startedAt, view.finishedAt)
   const status = STATUS_LABEL[view.status]
   const ready = view.status === 'done'
+  const bundleReady = view.status !== 'running'
   const canReplay = view.status === 'done' || view.status === 'failed' || replay
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -129,6 +130,13 @@ export function FlowHeader({ view, mode, replay, speed, onReplay }: FlowHeaderPr
             {fmt}
           </a>
         ))}
+        <a
+          href={bundleReady ? bundleUrl(view.runId) : undefined}
+          aria-disabled={!bundleReady}
+          className={`af-seg-item ${bundleReady ? '' : 'af-seg-disabled'}`}
+        >
+          ZIP
+        </a>
         <PublishButton key={view.runId} runId={view.runId} ready={ready} />
       </div>
     </header>

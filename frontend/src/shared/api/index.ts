@@ -1,1 +1,1 @@
-export { ApiError, REPLAY_SPEED, api, eventsUrl, exportUrl } from './client'
+export { ApiError, REPLAY_SPEED, api, bundleUrl, eventsUrl, exportUrl } from './client'

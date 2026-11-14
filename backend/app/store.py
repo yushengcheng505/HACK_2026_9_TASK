@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS events (
     data TEXT NOT NULL,
     PRIMARY KEY (run_id, seq)
 );
+CREATE TABLE IF NOT EXISTS llm_requests (
+    run_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    ts REAL NOT NULL,
+    node TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    user TEXT NOT NULL,
+    PRIMARY KEY (run_id, seq, ts)
+);
 CREATE TABLE IF NOT EXISTS providers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -151,6 +160,25 @@ class Store:
             rows = self.db.execute("SELECT * FROM events WHERE run_id = ? AND seq > ? ORDER BY seq",
                                    (run_id, after_seq)).fetchall()
         return [Event(r["run_id"], r["seq"], r["ts"], r["type"], json.loads(r["data"])) for r in rows]
+
+    def add_llm_request(self, run_id: str, node: str, prompt: str, user: str) -> None:
+        with self.lock, self.db:
+            seq = self.db.execute("SELECT COALESCE(MAX(seq), 0) FROM events WHERE run_id = ?",
+                                  (run_id,)).fetchone()[0]
+            self.db.execute("INSERT INTO llm_requests (run_id, seq, ts, node, prompt, user)"
+                            " VALUES (?, ?, ?, ?, ?, ?)", (run_id, seq, time.time(), node, prompt, user))
+
+    def llm_requests(self, run_id: str) -> list[dict]:
+        with self.lock:
+            rows = self.db.execute("SELECT * FROM llm_requests WHERE run_id = ? ORDER BY seq, ts",
+                                   (run_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def prompt_text(self, name: str, version: str) -> str | None:
+        with self.lock:
+            row = self.db.execute("SELECT content FROM prompt_versions WHERE name = ? AND version = ?",
+                                  (name, version)).fetchone()
+        return row[0] if row else None
 
     def save_prompts(self, prompts: dict[str, Prompt]) -> None:
         with self.lock, self.db:

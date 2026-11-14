@@ -3,12 +3,15 @@ import io
 import json
 import threading
 import time
+import zipfile
+from urllib.parse import quote
 
 import pytest
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 from app.main import create_app
+from app.prompts import load_prompt
 from tests.fake_llm import FakeLLM
 from tests.fake_tracker import FakeTracker
 
@@ -77,6 +80,63 @@ def test_demo_run_to_exports(client):
 
     history = client.get("/api/runs").json()
     assert history[0]["id"] == run_id and history[0]["stats"]["tasks_count"] == 4
+
+
+def test_demo_run_bundle():
+    llm = FakeLLM()
+    with TestClient(create_app(llm=llm)) as client:
+        run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+        run = wait_status(client, run_id, ("done", "failed"))
+        assert run["status"] == "done", run.get("error")
+        response = client.get(f"/api/runs/{run_id}/bundle")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/zip"
+        filename = quote(f"{run['result']['epic']['label']}_{run_id}.zip")
+        assert f"filename*=UTF-8''{filename}" in response.headers["content-disposition"]
+        store = client.app.state.store
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            names = archive.namelist()
+            assert {"README.md", "run.json", "input/epic.md", "result/result.json",
+                    "result/result.xlsx", "result/result.docx"} <= set(names)
+            assert "input/contracts/courier.proto" in names
+            assert archive.read("input/epic.md").decode().startswith(f"# {run['title']}\n")
+            metadata = json.loads(archive.read("run.json"))
+            assert "result" not in metadata and metadata["status"] == "done"
+            for name, version in run["prompt_versions"].items():
+                assert archive.read(f"prompts/{name}.md").decode() == load_prompt(name).text
+                assert store.prompt_text(name, version) == load_prompt(name).text
+            assert json.loads(archive.read("result/result.json"))["stats"]["tasks_count"] == 4
+            events = [json.loads(line) for line in archive.read("events.jsonl").splitlines()]
+            assert len(events) == len(store.events(run_id))
+            assert not any(e["type"] == "llm_request" for e in events)
+            step = next(n for n in names if n.startswith("steps/") and n.endswith("_requirements.md"))
+            text = archive.read(step).decode()
+            assert "## Запрос к модели (промпт requirements)" in text
+            assert llm.calls["requirements"][0] in text
+            requests = store.llm_requests(run_id)
+            assert len(requests) == sum(len(users) for users in llm.calls.values())
+            assert requests[0]["user"] == llm.calls["requirements"][0]
+            assert "token" in archive.read("README.md").decode()
+        assert "llm_request" not in [kind for kind, _ in read_sse(client, f"/api/runs/{run_id}/events")]
+
+
+@pytest.mark.parametrize("status", ["done", "failed", "paused", "waiting_answers", "running"])
+def test_bundle_without_checkpoint_or_requests(client, status):
+    store = client.app.state.store
+    run_id = f"bundle-old-{status}"
+    store.create_run(run_id, "Старый эпик", "ui", None, False)
+    store.update_run(run_id, status=status)
+    response = client.get(f"/api/runs/{run_id}/bundle")
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert set(archive.namelist()) == {"README.md", "run.json", "events.jsonl"}
+        readme = archive.read("README.md").decode()
+        assert "Запросы к LLM отсутствуют" in readme
+        assert "Состояние графа отсутствует" in readme
+
+
+def test_bundle_unknown_run(client):
+    assert client.get("/api/runs/missing/bundle").status_code == 404
 
 
 def test_questions_then_answers(client):
@@ -151,6 +211,12 @@ def test_pause_and_resume():
         assert client.post(f"/api/runs/{run_id}/pause").status_code == 200
         wait_status(client, run_id, ("paused",))
         assert client.post(f"/api/runs/{run_id}/pause").status_code == 409
+        bundle = client.get(f"/api/runs/{run_id}/bundle")
+        assert bundle.status_code == 200
+        with zipfile.ZipFile(io.BytesIO(bundle.content)) as archive:
+            assert "input/contracts/courier.proto" in archive.namelist()
+            assert "result/result.json" not in archive.namelist()
+            assert json.loads(archive.read("run.json"))["status"] == "paused"
 
         llm.release.set()
         assert client.post(f"/api/runs/{run_id}/resume").status_code == 200

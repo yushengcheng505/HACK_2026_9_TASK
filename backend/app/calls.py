@@ -53,6 +53,7 @@ def get_limiter(config: RunnableConfig) -> Limiter:
 
 
 async def ask(config: RunnableConfig, node: str, prompt: str, user: str, schema):
+    emit("llm_request", node=node, prompt=prompt, user=user)
     sink = TokenSink(node)
 
     def on_retry(attempt: int, reason: str) -> None:

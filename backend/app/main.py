@@ -16,6 +16,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field
 
 from app.bitbucket import BitbucketClient, epic_folders, parse_push, verify_signature
+from app.bundle import build_bundle
 from app.checks import compute_stats, run_checks
 from app.config import BACKEND_DIR, REPO_DIR, get_settings
 from app.demos import list_demos, load_demo
@@ -423,6 +424,19 @@ def create_app(llm: LLM | None = None, tracker: Tracker | None = None,
         series = [{"id": d.name, **doc(d / "report.md"), "runs": len(list(d.glob("*.json")))}
                   for d in sorted(BENCH_RESULTS.glob("*/"), reverse=True) if (d / "report.md").is_file()]
         return {"summary": doc(BENCH_SUMMARY) if BENCH_SUMMARY.is_file() else None, "series": series}
+
+    @app.get("/api/runs/{run_id}/bundle")
+    async def bundle(run_id: str):
+        run = get_run_or_404(run_id)
+        state = (await runner().graph.aget_state({"configurable": {"thread_id": run_id}})).values
+        prompts = {name: store().prompt_text(name, version)
+                   for name, version in (run.get("prompt_versions") or {}).items()}
+        content = build_bundle(run, state, prompts, [e.as_dict() for e in store().events(run_id)],
+                               store().llm_requests(run_id))
+        label = (run.get("result") or {}).get("epic", {}).get("label") or run_id
+        filename = quote(f"{label}_{run_id}.zip")
+        disposition = f"attachment; filename=\"{run_id}.zip\"; filename*=UTF-8''{filename}"
+        return Response(content, media_type="application/zip", headers={"Content-Disposition": disposition})
 
     @app.get("/api/runs/{run_id}/export/{fmt}")
     def export(run_id: str, fmt: str):

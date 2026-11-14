@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { PIPELINE, TASK_TYPE, shortOp } from '@/entities/run'
 import type { PipelineNode, RunView } from '@/entities/run'
-import { exportUrl } from '@/shared/api'
+import { bundleUrl, exportUrl } from '@/shared/api'
 import { routeHref } from '@/shared/lib/useHashRoute'
 import { STATUS_LABEL, lastRun } from '../model/agents'
 import type { AgentInstance } from '../model/agents'
@@ -209,6 +209,7 @@ function GateDetail({ view }: { view: RunView }) {
 
 function ResultDetail({ view }: { view: RunView }) {
   const ready = view.status === 'done'
+  const bundleReady = view.status !== 'running'
   const byType = view.stories.flatMap((s) => s.tasks).reduce<Record<string, number>>((acc, t) => ({ ...acc, [t.type]: (acc[t.type] ?? 0) + 1 }), {})
   return (
     <div className="af-detail-body">
@@ -250,6 +251,9 @@ function ResultDetail({ view }: { view: RunView }) {
             {fmt}
           </a>
         ))}
+        <a href={bundleReady ? bundleUrl(view.runId) : undefined} aria-disabled={!bundleReady} className={`af-pill ${bundleReady ? '' : 'opacity-40'}`}>
+          ZIP
+        </a>
       </div>
     </div>
   )

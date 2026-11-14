@@ -103,7 +103,9 @@ class Runner:
         try:
             async for mode, chunk in self.graph.astream(payload, config, stream_mode=["custom", "updates"]):
                 if mode == "custom":
-                    if chunk["type"] == "run_finished":
+                    if chunk["type"] == "llm_request":
+                        self.store.add_llm_request(run_id, **chunk["data"])
+                    elif chunk["type"] == "run_finished":
                         finished = chunk["data"]
                     else:
                         self.publish(run_id, chunk["type"], chunk["data"])

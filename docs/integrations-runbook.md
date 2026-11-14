@@ -48,6 +48,7 @@ print(httpx.get(e['JIRA_URL']+'/rest/api/3/myself', auth=(e['JIRA_EMAIL'], e['JI
 
 # 3. Публикация готового прогона (то же, что кнопка «В Jira»; повтор не создаёт дублей)
 curl -s -X POST localhost:8000/api/runs/<run_id>/publish
+curl -OJ localhost:8000/api/runs/<run_id>/bundle  # ZIP для разбора моделью: входы, промпты, шаги, события и результат, в том числе частичный
 
 # 4. Туннель доходит до бэкенда: без подписи должен быть 401 «Неверная подпись Bitbucket»
 curl -s -X POST <публичный-адрес>/api/webhooks/bitbucket -H 'X-Event-Key: repo:push' -d '{}'

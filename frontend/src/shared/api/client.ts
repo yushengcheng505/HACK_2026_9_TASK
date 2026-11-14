@@ -37,6 +37,7 @@ export const api = {
 }
 
 export const exportUrl = (runId: string, format: 'json' | 'xlsx' | 'docx') => `/api/runs/${runId}/export/${format}`
+export const bundleUrl = (runId: string) => `/api/runs/${runId}/bundle`
 export const REPLAY_SPEED = 4
 export const eventsUrl = (runId: string, replay: boolean, speed = REPLAY_SPEED) =>
   `/api/runs/${runId}/events${replay ? `?replay=1&speed=${speed}` : ''}`
