@@ -60,6 +60,23 @@ def story_text(stories: list[Story], story_id: str) -> str:
     return normalize("\n".join(task_text(t) for t in story.tasks)) if story else ""
 
 
+NEGATION = re.compile(r"(?<!\w)(нет|не|без|отсутству\w*|убра\w*|удал\w*|запрещ\w*|нельзя)(?!\w)")
+
+
+def mentioned(text: str, key: str) -> bool:
+    """Есть ли предложение, где key упомянут не в отрицании («поля X нет», «без X» — не в счёт)."""
+    key = normalize(key)
+    for sentence in re.split(r"(?<=[.!?;])\s+|\n", normalize(text)):
+        if key in sentence and not NEGATION.search(sentence):
+            return True
+    return False
+
+
+def tasks_text(stories: list[Story], story_id: str) -> str:
+    story = _story(stories, story_id)
+    return "\n".join(task_text(t) for t in story.tasks) if story else ""
+
+
 def strip_matching(text: str, pattern: re.Pattern) -> str:
     return " ".join(s for s in re.split(r"(?<=[.!?])\s+", text) if not pattern.search(s))
 
@@ -124,7 +141,7 @@ def mutate(state: dict, base_id: str) -> list[Mutation]:
     return [
         Mutation("M1", "противоречие решению: опрос каждые 30 секунд", poll_story, ["30 секунд", "30 с "],
                  ["contradicts_decision"], [poll_task],
-                 lambda ss: "30 секунд" not in story_text(ss, poll_story)),
+                 lambda ss: not mentioned(tasks_text(ss, poll_story), "30 секунд")),
         Mutation("M2", "непокрытый критерий: PDF-этикетка", tg["track"], ["этикет", "printlabel"],
                  ["criterion_not_covered"], [],
                  lambda ss: any(k in story_text(ss, tg["track"]) for k in ("этикет", "printlabel"))),
@@ -134,7 +151,7 @@ def mutate(state: dict, base_id: str) -> list[Mutation]:
                                     for t in (_story(ss, dup_story) or Story(id="", title="", description="")).tasks)),
         Mutation("M4", "переусложнение: Kafka и Schema Registry", log_story, ["kafka", "TASK-902"],
                  ["unneeded_task", "platform_covers"], ["TASK-902"],
-                 lambda ss: "kafka" not in story_text(ss, log_story)),
+                 lambda ss: not mentioned(tasks_text(ss, log_story), "kafka")),
         Mutation("M5", f"не то требование: {wrong_task} → {wrong_req}", log_story, [wrong_req],
                  ["wrong_requirement"], [wrong_task],
                  lambda ss: not any(wrong_req in t.requirement_ids
@@ -145,5 +162,5 @@ def mutate(state: dict, base_id: str) -> list[Mutation]:
                  lambda ss: bool(TIMEOUT.search(story_text(ss, tg["rate"])))),
         Mutation("M7", "расхождение с контрактом: поле courier_priority", contract_story, ["courier_priority"],
                  ["contract_mismatch"], [tg["contract"]],
-                 lambda ss: "courier_priority" not in story_text(ss, contract_story)),
+                 lambda ss: not mentioned(tasks_text(ss, contract_story), "courier_priority")),
     ]

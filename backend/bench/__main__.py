@@ -102,11 +102,28 @@ async def review(out: Path, repeats: int, parallel: int, variants: list[str], ba
 
 # ---------- отчёт ----------
 
-def _load(out: Path, kind: str) -> list[dict]:
-    rows = []
+def _starts() -> dict:
+    """Стартовые состояния и дефекты по основам — детерминированы, поэтому оценки можно пересчитать."""
+    starts = {}
+    for base in BASES:
+        clean = base_state(base)
+        mutated = copy.deepcopy(clean)
+        starts[(base, "defects")] = (mutated, mutate(mutated, base))
+        starts[(base, "control")] = (clean, [])
+    return starts
+
+
+def _load(out: Path, kind: str, rescore: bool = True) -> list[dict]:
+    """Результаты прогонов; оценки круга проверки пересчитываются текущими проверками дефектов."""
+    rows, starts = [], (_starts() if kind == "review" and rescore else {})
     for p in sorted(out.glob(f"{kind}-*.json")):
         data = json.loads(p.read_text(encoding="utf-8"))
-        data.pop("run", None)
+        run = data.pop("run", None)
+        if kind == "e2e" and rescore and run is not None:
+            data["score"] = score_e2e(run)
+        if starts and run is not None and (data["base"], data["state"]) in starts:
+            state, muts = starts[(data["base"], data["state"])]
+            data["score"] = score_review(run, muts, state)
         rows.append(data)
     return rows
 

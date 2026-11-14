@@ -41,7 +41,8 @@ def score_e2e(run: dict) -> dict:
     if result is None:
         return out
     gap_findings = [f for f in result.findings if f.source == "analyst" and CONTRADICTION.search(f.scenario)]
-    unresolved = [f for f in result.findings if f.verdict == "confirmed" and f.resolution not in ("fixed", "resolved")]
+    unresolved = [f for f in result.findings if f.source != "analyst" and f.verdict == "confirmed"
+                  and f.resolution not in ("fixed", "resolved")]
     return out | {
         "stories": len(result.stories),
         "tasks": result.stats.tasks_count,

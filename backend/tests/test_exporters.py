@@ -54,6 +54,15 @@ def test_xlsx_review_sheet_lists_findings(result):
     assert "Рецензент" in row and "подтверждено" in row
 
 
+def test_confirmed_gaps_are_not_listed_as_unresolved_review_remarks(result):
+    gap = next(f for f in result.findings if f.source == "analyst")
+    assert gap.verdict == "confirmed" and gap.resolution is None
+    edited = result.model_copy(update={"findings": [gap], "review_skipped": []})
+    doc = Document(io.BytesIO(to_docx(edited)))
+    headings = [p.text for p in doc.paragraphs if p.style.name.startswith("Heading")]
+    assert "Замечания проверки" not in headings
+
+
 def test_docx_review_section_shows_open_items_and_skipped(result):
     from app.schemas import ReviewSkip
 

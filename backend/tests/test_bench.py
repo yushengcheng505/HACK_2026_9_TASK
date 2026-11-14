@@ -12,6 +12,16 @@ def test_strip_matching_drops_only_matching_sentences():
     assert strip_matching(text, re.compile(r"тайм-?аут", re.I)) == "Вызывать CalculateRate. Логировать ответ."
 
 
+def test_negated_mention_does_not_count_as_defect():
+    from bench.mutations import mentioned
+
+    assert mentioned("Передавать поле courier_priority=HIGH. Логировать ответ.", "courier_priority")
+    assert not mentioned("Поля courier_priority в CreateShipmentRequest нет; приоритет не передаётся.",
+                         "courier_priority")
+    assert not mentioned("Журнал пишется в stdout без Kafka и Schema Registry.", "kafka")
+    assert mentioned("Опрос каждые 30 секунд.\nНе чаще раза в 15 минут.", "30 секунд")
+
+
 async def test_rate_limit_is_waited_out_and_counted():
     import httpx
     from openai import RateLimitError

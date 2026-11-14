@@ -68,9 +68,10 @@ def _resolution(f: Finding) -> str:
 
 
 def _open_findings(d: Decomposition) -> tuple[list[Finding], list[Finding]]:
-    """Нерешённые подтверждённые и пожелания (отложенные и пониженные)."""
-    unresolved = [f for f in d.findings if f.verdict == "confirmed" and f.resolution not in ("fixed", "resolved")]
-    wishes = [f for f in d.findings if f.verdict in ("deferred", "downgraded")]
+    """Нерешённые подтверждённые и пожелания. Пробелы аналитика — в своём разделе, здесь их нет."""
+    review = [f for f in d.findings if f.source != "analyst"]
+    unresolved = [f for f in review if f.verdict == "confirmed" and f.resolution not in ("fixed", "resolved")]
+    wishes = [f for f in review if f.verdict in ("deferred", "downgraded")]
     return unresolved, wishes
 
 
