@@ -172,7 +172,11 @@ def order_payload(server, hours, currency, key):
     flags = ["-hf", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M", "--no-mmproj",
              "--host", "0.0.0.0", "--port", "8080", "-ngl", "999", "-c", "98304", "-np", "4",
              "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "-fa", "on", "--jinja",
-             "--reasoning-budget", "0", "--alias", MODEL, "--api-key", key, "--slots", "--metrics"]
+             "--reasoning-budget", "0",
+             # Квантованный Qwen зацикливается в длинных строках JSON до лимита токенов; DRY штрафует повтор
+             # последовательностей. Проверено на зацикленном запросе рецензента: валидный ответ за 41 с вместо 3×6 мин.
+             "--dry-multiplier", "0.8", "--dry-base", "1.75", "--dry-allowed-length", "2",
+             "--alias", MODEL, "--api-key", key, "--slots", "--metrics"]
     return {"renting_server": server["id"], "type": "on-demand", "currency": currency,
             "image": IMAGE, "ports": {"22": "tcp", "8080": "tcp"},
             "autossh_entrypoint": True, "auto_renew": False, "rental_hours": hours,
