@@ -78,6 +78,26 @@ def test_demo_file_download(client):
     assert response.text.startswith('syntax = "proto3";')
 
 
+def test_llm_calls_are_bracketed_by_started_and_finished_events():
+    llm = FakeLLM()
+    with TestClient(create_app(llm=llm)) as client:
+        run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
+        assert wait_status(client, run_id, ("done", "failed"))["status"] == "done"
+        events = read_sse(client, f"/api/runs/{run_id}/events")
+    started = [d["node"] for t, d in events if t == "llm_started"]
+    finished = [d["node"] for t, d in events if t == "llm_finished"]
+    assert len(started) == sum(len(c) for c in llm.calls.values())
+    assert sorted(started) == sorted(finished)
+    open_calls = set()
+    for t, d in events:
+        if t == "llm_started":
+            open_calls.add(d["node"])
+        elif t == "llm_finished":
+            assert d["node"] in open_calls
+            open_calls.discard(d["node"])
+    assert not open_calls
+
+
 def test_demo_run_to_exports(client):
     run_id = client.post("/api/demos/boutique-delivery/run", json={"skip_questions": True}).json()["run_id"]
     run = wait_status(client, run_id, ("done", "failed"))

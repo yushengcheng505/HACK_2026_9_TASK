@@ -47,7 +47,7 @@ export function phaseOfCall(node: string): PipelineNode {
   return 'critic'
 }
 
-const emptyCall = (): AgentCall => ({ runs: [], retries: [], failure: null })
+const emptyCall = (): AgentCall => ({ runs: [], retries: [], failure: null, inflight: 0, tracked: false })
 
 function patchCall(view: RunView, node: string, patch: (call: AgentCall) => AgentCall): RunView['calls'] {
   return { ...view.calls, [node]: patch(view.calls[node] ?? emptyCall()) }
@@ -71,6 +71,36 @@ function appendStream(view: RunView, node: string, kind: 'content' | 'reasoning'
     const runs = last && last.round === round ? [...call.runs.slice(0, -1), run] : [...call.runs, run]
     return { ...call, runs }
   })
+}
+
+/** Начало вызова: открываем поток текущего круга, даже если токенов ещё нет. */
+function startCall(view: RunView, node: string, at: number): RunView['calls'] {
+  const round = view.nodes[phaseOfCall(node)].visits
+  return patchCall(view, node, (call) => {
+    const last = call.runs.at(-1)
+    const runs =
+      last && last.round === round
+        ? [...call.runs.slice(0, -1), { ...last, lastAt: at }]
+        : [...call.runs, { round, startedAt: at, lastAt: at, reasoning: '', content: '', trimmed: false }]
+    return { ...call, runs, inflight: call.inflight + 1, tracked: true }
+  })
+}
+
+/** Продолжение после паузы, сбой или конец прогона: оборванные запросы своего llm_finished не пришлют. */
+function dropInflight(calls: RunView['calls']): RunView['calls'] {
+  return Object.fromEntries(Object.entries(calls).map(([k, c]) => [k, c.inflight ? { ...c, inflight: 0 } : c]))
+}
+
+/** Шаг перезапущен после паузы и выполняется заново: оборванная попытка его агентов не считается сделанной. */
+function restartPhase(view: RunView, node: PipelineNode): RunView['calls'] {
+  const round = view.nodes[node].visits
+  return Object.fromEntries(
+    Object.entries(view.calls).map(([k, c]) =>
+      phaseOfCall(k) === node && c.runs.at(-1)?.round === round
+        ? [k, { ...c, runs: c.runs.slice(0, -1), inflight: 0 }]
+        : [k, c],
+    ),
+  )
 }
 
 /** Ключ экземпляра агента для пропущенного шага проверки. */
@@ -174,8 +204,10 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
     case 'node_started': {
       const node = d.node as string
       if (!isPipelineNode(node)) return next
+      const restarted = view.nodes[node].phase === 'active'
       return {
         ...next,
+        calls: restarted ? restartPhase(view, node) : view.calls,
         activeNode: node,
         taskTargets: node === 'tasks' ? ((d.stories as string[] | undefined) ?? []) : view.taskTargets,
         // Узел уже активен — его перезапустили после паузы: это тот же заход, а не новый.
@@ -233,6 +265,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
       return {
         ...next,
         status: 'running',
+        calls: dropInflight(view.calls),
         concurrency: (d.concurrency as number | undefined) ?? view.concurrency,
         log: pushLog(view, line(e, 'Продолжение с последнего сохранённого шага', 'brand')),
       }
@@ -313,6 +346,17 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         calls: patchCall(view, `tasks:${d.story_id as string}`, (c) => ({ ...c, failure: d.error as string })),
         log: pushLog(view, line(e, `${d.story_id as string}: модель не дала задачи — ${d.error as string}`, 'hazard')),
+      }
+    case 'llm_started':
+      return { ...next, calls: startCall(view, d.node as string, e.receivedAt) }
+    case 'llm_finished':
+      return {
+        ...next,
+        calls: patchCall(view, d.node as string, (c) => {
+          const last = c.runs.at(-1)
+          const runs = last ? [...c.runs.slice(0, -1), { ...last, lastAt: e.receivedAt }] : c.runs
+          return { ...c, runs, inflight: Math.max(0, c.inflight - 1) }
+        }),
       }
     case 'llm_retry':
       return {
@@ -417,6 +461,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         status: 'done',
         activeNode: null,
+        calls: dropInflight(view.calls),
         finishedAt: view.finishedAt ?? e.receivedAt,
         stats: d.stats as Stats,
         coverage: (d.coverage as Coverage) ?? view.coverage,
@@ -427,6 +472,7 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ...next,
         status: 'failed',
         activeNode: null,
+        calls: dropInflight(view.calls),
         error: d.error as string,
         finishedAt: e.receivedAt,
         log: pushLog(view, line(e, `Сбой: ${d.error as string}`, 'hazard')),

@@ -60,10 +60,13 @@ async def ask(config: RunnableConfig, node: str, prompt: str, user: str, schema)
         sink.flush()
         emit("llm_retry", node=node, attempt=attempt, reason=reason[:500])
 
+    # Явные границы вызова: по ним пульт показывает «работает», а не угадывает по паузам в потоке токенов.
+    emit("llm_started", node=node)
     try:
         return await get_llm(config).complete_json(prompt, user, schema, on_token=sink, on_retry=on_retry)
     finally:
         sink.flush()
+        emit("llm_finished", node=node)
 
 
 def sources_of(state: dict) -> list[Source]:

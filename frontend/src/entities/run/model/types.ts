@@ -265,6 +265,10 @@ export interface AgentCall {
   runs: StreamRun[]
   retries: { at: number; attempt: number; reason: string }[]
   failure: string | null
+  /** Сколько запросов к модели сейчас в работе — по событиям llm_started / llm_finished. */
+  inflight: number
+  /** Бэкенд присылает границы вызовов; в старых записях их нет — статус угадывается по потоку токенов. */
+  tracked: boolean
 }
 
 export interface ReviewTally {

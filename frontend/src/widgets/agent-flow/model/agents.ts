@@ -61,9 +61,19 @@ function reviewTargets(view: RunView): Set<string> {
   return new Set(previous?.notes.map((n) => n.story_id) ?? [])
 }
 
+const inflightOf = (view: RunView, keys: string[]) => keys.some((k) => (view.calls[k]?.inflight ?? 0) > 0)
+const trackedOf = (view: RunView, keys: string[]) => keys.some((k) => view.calls[k]?.tracked)
+
 /** Статус по вызову в текущем круге: пишет, закончил или ещё в очереди. */
 function byCall(view: RunView, keys: string[], round: number, now: number, targeted: boolean): AgentStatus {
   const run = lastRun(view, keys)
+  // Границы вызова известны точно: «работает», пока запрос к модели не завершился, даже если токены идут с паузами.
+  if (trackedOf(view, keys)) {
+    if (inflightOf(view, keys)) return view.status === 'paused' ? 'paused' : 'working'
+    if (run && run.round === round) return 'done'
+    if (failureOf(view, keys)) return 'failed'
+    return targeted ? 'queued' : run ? 'done' : 'idle'
+  }
   // На паузе часы графа стоят, поэтому «писал в момент паузы» сохраняется — такой агент ждёт продолжения.
   if (run && run.round === round) return now - run.lastAt < LIVE_MS ? (view.status === 'paused' ? 'paused' : 'working') : 'done'
   if (failureOf(view, keys)) return 'failed'
@@ -127,7 +137,9 @@ export function buildInstances(view: RunView, now: number): AgentInstance[] {
 
   const skepticKeys = ['skeptic:gaps', 'skeptic', 'critic']
   const run = lastRun(view, skepticKeys)
-  const skepticLive = run && now - run.lastAt < LIVE_MS && (view.activeNode === 'analyst' || view.activeNode === 'critic')
+  const skepticLive = trackedOf(view, skepticKeys)
+    ? inflightOf(view, skepticKeys)
+    : run && now - run.lastAt < LIVE_MS && (view.activeNode === 'analyst' || view.activeNode === 'critic')
   // Скептик проверяет и пробелы аналитика, и каждый круг проверки, — «готово» только когда весь прогон завершён.
   const skeptic: AgentStatus = skepticLive
     ? view.status === 'paused'
