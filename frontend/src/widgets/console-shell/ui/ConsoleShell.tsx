@@ -19,7 +19,6 @@ const NAV: { route: ConsoleRoute; index: string; label: string }[] = [
   { route: { name: 'models' }, index: '03', label: 'Модели' },
   { route: { name: 'prompts' }, index: '04', label: 'Промпты' },
   { route: { name: 'bench' }, index: '05', label: 'Бенчмарк' },
-  { route: { name: 'lab' }, index: '06', label: 'Лаборатория' },
 ]
 
 export function ConsoleShell({ route, bare = false, children }: ConsoleShellProps) {
