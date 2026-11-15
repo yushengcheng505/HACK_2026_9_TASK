@@ -172,12 +172,14 @@ def order_payload(server, hours, currency, key):
     flags = ["-hf", "unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M", "--no-mmproj",
              "--host", "0.0.0.0", "--port", "8080", "-ngl", "999", "-c", "98304", "-np", "4",
              "--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "-fa", "on", "--jinja",
-             "--alias", MODEL, "--api-key", key, "--slots", "--metrics"]
+             "--reasoning-budget", "0", "--alias", MODEL, "--api-key", key, "--slots", "--metrics"]
     return {"renting_server": server["id"], "type": "on-demand", "currency": currency,
             "image": IMAGE, "ports": {"22": "tcp", "8080": "tcp"},
             "autossh_entrypoint": True, "auto_renew": False, "rental_hours": hours,
             "ssh_password": secrets.token_urlsafe(24),
-            "command": "#!/bin/sh\nset -eu\ncd /app\nexec /app/llama-server " + shlex.join(flags) + "\n"}
+            # Проверено на живом заказе: с autossh_entrypoint clore выполняет command как стартовый скрипт
+            # (без него запускает ENTRYPOINT образа без аргументов). Сервер — в фоне, лог в /root/llama.log.
+            "command": "cd /app && nohup ./llama-server " + shlex.join(flags) + " > /root/llama.log 2>&1 &"}
 
 
 def endpoint(value):
@@ -292,8 +294,10 @@ def validate_completion(response, structured):
         text = response["choices"][0]["message"]["content"]
         if not isinstance(text, str) or not text.strip():
             raise ValueError("пустой ответ")
-        if structured and json.loads(text) != {"ok": True}:
-            raise ValueError("JSON не соответствует схеме")
+        if structured:
+            value = json.loads(text)
+            if not isinstance(value, dict) or set(value) != {"ok"} or value["ok"] is not True:
+                raise ValueError("JSON не соответствует схеме")
     except (KeyError, IndexError, TypeError, ValueError):
         hint = "; переключите LLM_JSON_MODE=json_object и повторите проверку" if structured else ""
         raise RuntimeError("Невалидный ответ модели" + hint) from None
@@ -339,6 +343,9 @@ def configure(addresses, key):
 
 def up(args, api, config, currency):
     state = load_state()
+    if state.get("creation_pending"):
+        raise RuntimeError("Неопределённый create_order: проверьте My Orders, отмените/сохраните id заказа "
+                           "и только затем удалите creation_pending из deploy/clore-state.json")
     if any(not o.get("ended") for o in state["orders"]):
         raise RuntimeError("В state есть заказы. Сначала status/down; повторный up не создаёт дубликаты.")
     key = config.get("LLM_API_KEY")
@@ -382,13 +389,23 @@ def up(args, api, config, currency):
         state = {"orders": [], "api_key": key, "created": time.time()}
         save_state(state)
         for s, payload in zip(selected, payloads):
+            state["creation_pending"] = {"server_id": s["id"], "requested": time.time()}
+            save_state(state)
+            known = {str(o.get("id")) for o in api.call("my_orders").get("orders", [])}
             result = api.call("create_order", payload)
             ident = result.get("order_id") or result.get("id")
+            for _ in range(10):
+                if ident is not None:
+                    break
+                time.sleep(3)
+                ident = next((o.get("id") for o in api.call("my_orders").get("orders", [])
+                              if o.get("si") == s["id"] and str(o.get("id")) not in known), None)
             if ident is None:
                 print("Ответ create_order (секреты скрыты): " + json.dumps(redact(result), ensure_ascii=False))
                 raise RuntimeError("Нет order_id/id. Проверьте My Orders в UI; НЕ повторяйте up вслепую.")
             state["orders"].append({"id": ident, "server_id": s["id"], "created": time.time(),
-                                    "usd_day": daily_price(s, currency)})
+                                    "usd_day": daily_price(s, currency), "ssh_password": payload["ssh_password"]})
+            state.pop("creation_pending", None)
             save_state(state)
             print(f"Создан заказ {ident}, сервер {s['id']}", flush=True)
         addresses = []
@@ -402,7 +419,7 @@ def up(args, api, config, currency):
                         saved["raw_order"] = redact(order)
                         save_state(state)
                         print("Первый JSON заказа (секреты скрыты): " + json.dumps(saved["raw_order"], ensure_ascii=False), flush=True)
-                    status = str(order.get("status", "неизвестно")).lower()
+                    status = str(order.get("status") or ("running" if order.get("online") else "ожидание")).lower()
                     if status in TERMINAL or status in {"failed", "error"}:
                         raise RuntimeError(f"Заказ {saved['id']}: {status}; проверьте Clore, затем down")
                     address = resolve_endpoint(order)
@@ -424,18 +441,21 @@ def up(args, api, config, currency):
 def status(api, config):
     state = load_state()
     failures = []
-    active = [o for o in state["orders"] if not o.get("ended")]
-    if active:
+    if state.get("creation_pending"):
+        failures.append("Неопределённый create_order: проверьте My Orders перед повторной арендой/очисткой state")
+    if state["orders"]:
         try:
             orders = api.call("my_orders?return_completed=true")["orders"]
             for saved in state["orders"]:
                 order = next((o for o in orders if str(o.get("order_id", o.get("id"))) == str(saved["id"])), {})
-                start = float(order.get("started") or order.get("created") or saved["created"])
+                start = float(order.get("started") or order.get("ct") or order.get("created") or saved["created"])
                 end = float(saved.get("ended") or order.get("ended") or time.time())
                 hours = max(0, end - start) / 3600
                 price = saved.get("usd_day")
-                spend = f"${price * hours / 24:.2f} (оценка без комиссий)" if price is not None else "неизвестно"
-                print(f"Заказ {saved['id']}: {order.get('status', 'нет в ответе')}; {hours:.2f} ч; "
+                spend = (f"${float(order['spend']):.2f} (по данным Clore)" if order.get("spend") is not None
+                         else f"${price * hours / 24:.2f} (оценка без комиссий)" if price is not None else "неизвестно")
+                state_text = order.get("status") or ("online" if order.get("online") else "нет в ответе")
+                print(f"Заказ {saved['id']}: {state_text}; {hours:.2f} ч; "
                       f"$/день={price}; затраты {spend}")
         except (OSError, RuntimeError, ValueError) as exc:
             failures.append(str(exc))
@@ -503,6 +523,9 @@ def down(args, api):
     state.pop("attached", None)
     save_state(state)
     print("HAProxy отключён от GPU. Ручные аренды --attach отмените отдельно в Clore UI.")
+    if state.get("creation_pending"):
+        raise RuntimeError("Неопределённый create_order: возможный дополнительный заказ отмените в My Orders. "
+                           "После проверки удалите creation_pending из state; известные заказы уже отменены.")
 
 
 def parser():

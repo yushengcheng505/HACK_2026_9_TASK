@@ -3,3 +3,5 @@
 clore-state.json
 clore-state.json.tmp
 __pycache__/
+clore-llm.key
+clore-manual.json

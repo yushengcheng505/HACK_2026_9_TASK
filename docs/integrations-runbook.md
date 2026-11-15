@@ -55,6 +55,8 @@ ssh root@31.77.251.162 'cd /opt/synaps && git pull && cd deploy && docker compos
 Подключить модель на другой машине (vLLM или llama-server, OpenAI-совместимый API):
 1. В `/opt/synaps/deploy/.env` — `LLM_PRIMARY=<ip>:<порт>` и `LLM_BACKUP=<ip>:<порт>` (резерв; если его нет —
    тот же адрес). Порт модели на той машине должен быть открыт для `31.77.251.162`.
+   `LLM_API_KEY` в `deploy/.env` и `backend/.env` должен совпадать с ключом обеих моделей:
+   HAProxy отправляет его при health check. Для управляемой аренды всё это делает `deploy/clore.py`.
 2. В `/opt/synaps/backend/.env` — `LLM_MODEL=<имя модели, как его отдаёт /v1/models>`; для Qwen на vLLM ещё
    `LLM_EXTRA_BODY={"chat_template_kwargs":{"enable_thinking":false}}` и при vLLM `LLM_CONCURRENCY=4`.
 3. `cd /opt/synaps/deploy && docker compose up -d --force-recreate haproxy backend`
