@@ -2,6 +2,7 @@
 __pycache__/
 .pytest_cache/
 .env
+.env.bak
 data/
 .langgraph_api/
 bench/results/**/*.json

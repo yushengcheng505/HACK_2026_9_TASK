@@ -1,1 +1,5 @@
 .env
+.env.bak
+clore-state.json
+clore-state.json.tmp
+__pycache__/
