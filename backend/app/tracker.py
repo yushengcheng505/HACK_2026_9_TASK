@@ -1,3 +1,4 @@
+import asyncio
 import re
 import time
 from typing import Literal, Protocol
@@ -7,6 +8,10 @@ from pydantic import BaseModel
 
 from app.config import Settings
 from app.schemas import Decomposition, Story, Task
+
+
+ATTEMPTS = 3
+RETRY_STATUSES = {429, 502, 503, 504}
 
 
 class TrackerError(RuntimeError):
@@ -72,10 +77,23 @@ class JiraTracker:
         self.transport = transport
 
     async def _request(self, client: httpx.AsyncClient, method: str, path: str, **kwargs) -> dict:
-        try:
-            response = await client.request(method, path, **kwargs)
-        except httpx.HTTPError as exc:
-            raise TrackerError("Jira: не удалось выполнить запрос") from exc
+        """Разовые сбои сети и 429/5xx повторяются. Создание задачи (POST) после отправки не повторяется:
+        Jira могла её уже создать — тогда повторная публикация найдёт задачу по метке, а не создаст дубль."""
+        for attempt in range(1, ATTEMPTS + 1):
+            try:
+                response = await client.request(method, path, **kwargs)
+            except httpx.HTTPError as exc:
+                not_sent = isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
+                if attempt < ATTEMPTS and (method != "POST" or not_sent):
+                    await asyncio.sleep(attempt)
+                    continue
+                raise TrackerError(f"Jira: сеть недоступна ({type(exc).__name__}), повторите публикацию — "
+                                   "уже созданные задачи обновятся, дублей не будет") from exc
+            if response.status_code in RETRY_STATUSES and attempt < ATTEMPTS:
+                retry_after = response.headers.get("Retry-After", "")
+                await asyncio.sleep(int(retry_after) if retry_after.isdigit() else attempt)
+                continue
+            break
         if response.is_error:
             try:
                 body = response.json()
