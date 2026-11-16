@@ -319,12 +319,18 @@ export function Inspector({ view, selected, onSelect, onGap, stage }: InspectorP
   }
 
   return (
-    <aside className="flex min-h-0 flex-col border-l border-line bg-ink/90" aria-label="Инспектор">
+    <aside className={`ins-sheet ${selected || stage ? 'ins-sheet-on' : ''} flex min-h-0 flex-col border-l border-line bg-ink/90`} aria-label="Инспектор">
       <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
         {head}
         {(selected || stage) && (
-          <button type="button" onClick={() => onSelect(null)} className="press tag cursor-pointer text-fg-dim hover:text-fg" title="Сбросить выбор">
-            esc ×
+          <button
+            type="button"
+            onClick={() => onSelect(null)}
+            className="press tag -my-2 -mr-2 min-h-11 shrink-0 cursor-pointer px-2 text-fg-dim hover:text-fg lg:m-0 lg:min-h-0 lg:p-0"
+            title="Сбросить выбор"
+            aria-label="Сбросить выбор"
+          >
+            <span className="max-lg:hidden">esc </span>×
           </button>
         )}
       </div>

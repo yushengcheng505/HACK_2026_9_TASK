@@ -28,7 +28,8 @@ function streamOf(tokens: TokenChunk[]) {
 
 function TelemetryImpl({ view }: { view: RunView }) {
   const [manual, setManual] = useState<boolean | null>(null)
-  const open = manual ?? view.status !== 'done'
+  // На узком экране телеметрия по умолчанию свёрнута — иначе съедает карту.
+  const open = manual ?? (view.status !== 'done' && window.matchMedia('(min-width: 64rem)').matches)
   const streamBox = useRef<HTMLDivElement>(null)
   const logBox = useRef<HTMLDivElement>(null)
   const stream = useMemo(() => streamOf(view.tokens), [view.tokens])
@@ -45,16 +46,16 @@ function TelemetryImpl({ view }: { view: RunView }) {
   return (
     <section
       aria-label="Телеметрия"
-      className={`grid grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-px border-t border-line bg-line transition-[height] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+      className={`grid grid-cols-[minmax(0,1fr)] gap-px border-t border-line bg-line transition-[height] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] ${
         open ? 'h-[176px]' : 'h-9'
       }`}
     >
       <div className="flex min-h-0 flex-col bg-ink">
         <div className="flex h-9 shrink-0 items-center gap-3 border-b border-line px-4">
-          <button type="button" onClick={() => setManual(!open)} className="press tag cursor-pointer text-fg-dim hover:text-fg">
+          <button type="button" onClick={() => setManual(!open)} className="press tag shrink-0 cursor-pointer whitespace-nowrap text-fg-dim hover:text-fg">
             {open ? '▾' : '▸'} телеметрия
           </button>
-          <span className="tag text-fg-soft">
+          <span className="tag min-w-0 truncate text-fg-soft">
             поток модели{stream ? ` · ${nodeLabel(stream.node)}` : ''}
           </span>
           {live && stream && (
@@ -74,7 +75,7 @@ function TelemetryImpl({ view }: { view: RunView }) {
           {live && stream && <span className="fx-caret" />}
         </div>
       </div>
-      <div className="flex min-h-0 flex-col bg-ink">
+      <div className="flex min-h-0 flex-col bg-ink max-md:hidden">
         <div className="flex h-9 shrink-0 items-center justify-between border-b border-line px-4">
           <span className="tag text-fg-soft">журнал событий</span>
           <span className="tag text-fg-dim">seq {view.lastSeq}</span>

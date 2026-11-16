@@ -55,7 +55,7 @@ export function LabPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-ink">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-6 pb-5 sm:px-8 sm:pt-7 sm:pb-6">
         <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
           Лаборатория.
           <br />
@@ -65,8 +65,8 @@ export function LabPanel() {
           Сопоставьте две разбивки: что совпало, какие требования пропущены и какая работа выходит за рамки эпика.
         </p>
       </header>
-      <div className="flex flex-col gap-6 px-8 pb-8">
-        <section className={`${cardClass} flex flex-col gap-3 p-6`} aria-label="Выбор запуска">
+      <div className="flex flex-col gap-6 px-4 pb-6 sm:px-8 sm:pb-8">
+        <section className={`${cardClass} flex flex-col gap-3 p-5 sm:p-6`} aria-label="Выбор запуска">
           <label className="flex flex-col gap-2">
             <span className={captionClass}>Завершённый запуск</span>
             <select value={selected} onChange={(e) => setSelected(e.target.value)} disabled={!runs?.length} className={fieldClass}>
@@ -143,7 +143,7 @@ function Comparison({ selected }: { selected: RunRecord }) {
 
   return (
     <>
-      <form onSubmit={submit} className={`${cardClass} flex flex-col gap-5 p-6`} aria-labelledby="analyst-title" aria-busy={busy}>
+      <form onSubmit={submit} className={`${cardClass} flex flex-col gap-5 p-5 sm:p-6`} aria-labelledby="analyst-title" aria-busy={busy}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="analyst-title" className="font-display text-[19px] font-semibold text-fg">Разбивка аналитика</h2>
           {reference !== null && (
@@ -235,7 +235,7 @@ function ComparisonResult({ result, tasks }: { result: LabResult; tasks: Task[] 
           ))}
         </ResultColumn>
       </div>
-      <section className={`${cardClass} p-6`} aria-labelledby="lab-contracts">
+      <section className={`${cardClass} p-5 sm:p-6`} aria-labelledby="lab-contracts">
         <h2 id="lab-contracts" className="font-display text-[19px] font-semibold text-fg">Методы контракта: пропуски аналитика</h2>
         {result.contract_ops_missed.length + result.contract_tests_missed.length > 0 ? (
           <ul className="mt-4 flex flex-col gap-2">
@@ -252,7 +252,7 @@ function ComparisonResult({ result, tasks }: { result: LabResult; tasks: Task[] 
           </ul>
         ) : <p className="mt-3 text-[13px] text-fg-dim">Пропущенных методов нет.</p>}
       </section>
-      <section className={`${cardClass} p-6`} aria-labelledby="lab-recommendations">
+      <section className={`${cardClass} p-5 sm:p-6`} aria-labelledby="lab-recommendations">
         <h2 id="lab-recommendations" className="font-display text-[19px] font-semibold text-fg">Рекомендации</h2>
         {result.recommendations.length > 0 ? (
           <ol className="mt-4 flex list-decimal flex-col gap-3 pl-5 text-[14px] leading-relaxed break-words text-fg-muted marker:font-mono marker:text-brand">

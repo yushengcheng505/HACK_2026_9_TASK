@@ -37,14 +37,14 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
   const answered = questions.filter((q) => choices[q.id]).length
 
   return (
-    <div className="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-ink/80 px-6 py-8 backdrop-blur-[3px]">
-      <div className="fx-enter h-fit w-full max-w-[880px] overflow-hidden rounded-[28px] border border-amber/40 bg-surface shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
-        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-6 py-5">
+    <div className="absolute inset-0 z-20 flex justify-center overflow-y-auto bg-ink/80 px-3 py-4 backdrop-blur-[3px] sm:px-6 sm:py-8">
+      <div className="fx-enter h-fit w-full max-w-[880px] overflow-hidden rounded-[22px] border border-amber/40 sm:rounded-[28px] bg-surface shadow-[0_30px_80px_rgba(0,0,0,0.45)]">
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-line px-4 py-5 sm:px-6">
           <div className="flex flex-col gap-2">
             <span className="tag flex items-center gap-2 text-amber">
               <span className="fx-pulse-amber size-2 rounded-full bg-amber" />[ граф на паузе · аналитик спрашивает ]
             </span>
-            <h2 className="font-display text-[24px] leading-tight font-semibold tracking-[-0.02em] text-fg">
+            <h2 className="font-display text-[20px] leading-tight sm:text-[24px] font-semibold tracking-[-0.02em] text-fg">
               Уточните, прежде чем агент разложит эпик
             </h2>
             <p className="max-w-[620px] text-[13px] leading-relaxed text-fg-muted">
@@ -61,7 +61,7 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
           {questions.map((q, qi) => {
             const c = choices[q.id]
             return (
-              <li key={q.id} className="border-b border-line px-6 py-5">
+              <li key={q.id} className="border-b border-line px-4 py-5 sm:px-6">
                 <div className="mb-3 flex items-start gap-3">
                   <span className="mt-[3px] shrink-0 rounded-full border border-amber/40 px-2 py-0.5 font-mono text-[11px] leading-none font-bold whitespace-nowrap text-amber">
                     {q.id}
@@ -108,8 +108,8 @@ export function QuestionsPanel({ runId, questions }: QuestionsPanelProps) {
           })}
         </ol>
 
-        {error && <p className="px-6 pt-4 font-mono text-[12px] text-hazard">{error}</p>}
-        <footer className="flex flex-wrap items-center justify-end gap-3 px-6 py-5">
+        {error && <p className="px-4 pt-4 font-mono sm:px-6 text-[12px] text-hazard">{error}</p>}
+        <footer className="flex flex-wrap items-center justify-end gap-3 px-4 py-5 sm:px-6">
           <button
             type="button"
             disabled={busy}

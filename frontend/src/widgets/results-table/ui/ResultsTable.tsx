@@ -60,7 +60,7 @@ export function ResultsTable({ view, onSaved, onSelect }: ResultsTableProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex min-h-[52px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-6 py-2">
+      <div className="flex min-h-[52px] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-2 sm:px-6">
         <p className="text-[13px] text-fg-muted">
           {editable ? 'Текст и типы можно править — проверки пересчитаются без новой генерации.' : 'Править можно, когда прогон закончится.'}
         </p>
@@ -88,7 +88,7 @@ export function ResultsTable({ view, onSaved, onSelect }: ResultsTableProps) {
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-4 sm:px-6">
         <table className="w-full min-w-[920px] border-collapse text-left">
           <thead className="sticky top-0 z-[1] bg-ink">
             <tr>

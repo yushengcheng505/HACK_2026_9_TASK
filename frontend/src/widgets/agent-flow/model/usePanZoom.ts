@@ -7,13 +7,13 @@ export interface View2D {
   k: number
 }
 
-export const ZOOM = { min: 0.35, max: 2.5 } as const
+export const ZOOM = { min: 0.2, max: 2.5 } as const
 const DRAG_THRESHOLD = 4
 const clampK = (k: number) => Math.min(ZOOM.max, Math.max(ZOOM.min, k))
 
 /**
  * Панорама и зум холста. Колесо мыши и pinch трекпада приближают к курсору, прокрутка двумя пальцами
- * и перетаскивание — двигают. Пока пользователь не трогал холст, мир вписывается в окно при каждом ресайзе.
+ * и перетаскивание — двигают; на сенсорном экране щипок масштабирует, палец двигает. Пока пользователь не трогал холст, мир вписывается в окно при каждом ресайзе.
  */
 export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, world: { w: number; h: number }, size: { w: number; h: number }) {
   const [view, setView] = useState<View2D>({ x: 0, y: 0, k: 1 })
@@ -90,13 +90,43 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, world: { 
   }, [viewport, zoomAt, panBy])
 
   const drag = useRef<{ id: number; x: number; y: number; moved: boolean } | null>(null)
+  /** Касания на холсте: два пальца — щипок, он масштабирует к середине между ними и двигает холст. */
+  const touches = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ dist: number; mx: number; my: number } | null>(null)
+
+  const pinchOf = () => {
+    const [a, b] = [...touches.current.values()]
+    return { dist: Math.hypot(a.x - b.x, a.y - b.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 }
+  }
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
+    if (e.pointerType === 'touch') {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.current.size === 2) {
+        pinch.current = pinchOf()
+        drag.current = null
+        suppressClick.current = true
+        setDragging(true)
+        return
+      }
+    }
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false }
     suppressClick.current = false
   }
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const p = pinch.current
+      if (p && touches.current.size === 2) {
+        const next = pinchOf()
+        const rect = e.currentTarget.getBoundingClientRect()
+        panBy(next.mx - p.mx, next.my - p.my)
+        if (p.dist > 0) zoomAt(next.dist / p.dist, next.mx - rect.left, next.my - rect.top, false)
+        pinch.current = next
+        return
+      }
+    }
     const d = drag.current
     if (!d || d.id !== e.pointerId) return
     const dx = e.clientX - d.x
@@ -112,6 +142,14 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, world: { 
     panBy(dx, dy)
   }
   const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (touches.current.delete(e.pointerId) && pinch.current) {
+      if (touches.current.size < 2) pinch.current = null
+      // Щипок закончился, один палец остался — продолжаем двигать от его текущей точки без скачка.
+      const [rest] = [...touches.current.entries()]
+      drag.current = rest ? { id: rest[0], x: rest[1].x, y: rest[1].y, moved: true } : null
+      if (!rest) setDragging(false)
+      return
+    }
     const d = drag.current
     if (!d || d.id !== e.pointerId) return
     suppressClick.current = d.moved

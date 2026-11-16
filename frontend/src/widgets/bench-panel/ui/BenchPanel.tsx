@@ -37,7 +37,7 @@ export function BenchPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-ink lg:overflow-hidden">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-6 pb-5 sm:px-8 sm:pt-7 sm:pb-6">
         <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
           Качество проверки.
           <br />
@@ -55,9 +55,9 @@ export function BenchPanel() {
         </div>
       </header>
 
-      <div className="grid gap-6 px-8 pb-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:gap-6 px-4 pb-6 sm:px-8 sm:pb-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[260px_minmax(0,1fr)]">
         <section className={`${cardClass} flex flex-col self-start overflow-hidden lg:max-h-full`} aria-labelledby="reports-title">
-          <div className="flex items-baseline justify-between gap-4 px-6 pt-6 pb-4">
+          <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <h2 id="reports-title" className="font-display text-[19px] font-semibold text-fg">
               Отчёты
             </h2>
@@ -144,7 +144,7 @@ function Report({ markdown }: { markdown: string }) {
   }
 
   return (
-    <article ref={scroller} className={`${cardClass} fx-enter min-w-0 px-7 py-7 lg:min-h-0 lg:overflow-y-auto`}>
+    <article ref={scroller} className={`${cardClass} fx-enter min-w-0 px-5 py-6 sm:px-7 sm:py-7 lg:min-h-0 lg:overflow-y-auto`}>
       <div className={sections.length > 0 ? 'grid gap-10 min-[1680px]:grid-cols-[minmax(0,1fr)_clamp(240px,22%,320px)]' : undefined}>
         <div className="min-w-0">
           <Markdown source={markdown} />

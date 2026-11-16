@@ -446,9 +446,12 @@ function StoryFocusImpl({ view, selected, onSelect, gapId }: StoryFocusProps) {
   }
 
   return (
-    <div className="grid h-full grid-cols-[236px_minmax(0,1fr)]">
-      <nav className="flex min-h-0 flex-col gap-1 overflow-y-auto border-r border-line px-3 py-4" aria-label="Истории">
-        <span className="mb-1 px-2 text-[12px] font-semibold text-fg-dim">
+    <div className="grid h-full grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[236px_minmax(0,1fr)] lg:grid-rows-1">
+      <nav
+        className="scroll-fade flex min-h-0 gap-1 overflow-x-auto overscroll-x-contain border-b border-line bg-ink px-2 py-2 [scrollbar-width:none] lg:flex-col lg:bg-transparent lg:overflow-x-visible lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-3 lg:py-4"
+        aria-label="Истории"
+      >
+        <span className="mb-1 px-2 text-[12px] font-semibold text-fg-dim max-lg:hidden">
           Истории <span className="font-mono font-normal">{view.stories.length}</span>
         </span>
         {lanes.map((lane) => {
@@ -463,7 +466,7 @@ function StoryFocusImpl({ view, selected, onSelect, gapId }: StoryFocusProps) {
               type="button"
               onClick={() => open(lane.key)}
               aria-current={on ? 'true' : undefined}
-              className={`press relative flex cursor-pointer flex-col gap-0.5 rounded-lg px-3 py-2 text-left ${
+              className={`press relative flex shrink-0 cursor-pointer flex-col gap-0.5 rounded-lg px-3 py-2 text-left max-lg:max-w-[200px] ${
                 on ? 'bg-panel shadow-[inset_0_0_0_1px_rgb(1_222_130/0.35)]' : 'hover:bg-surface'
               }`}
             >
@@ -482,11 +485,11 @@ function StoryFocusImpl({ view, selected, onSelect, gapId }: StoryFocusProps) {
             </button>
           )
         })}
-        {pending && <span className="px-2 text-[12px] leading-snug text-fg-dim">{running ? 'Истории появятся здесь.' : 'Историй нет.'}</span>}
-        <span className="mt-auto px-2 pt-3 font-mono text-[10.5px] text-fg-dim/70">↑ ↓ — соседняя история</span>
+        {pending && <span className="shrink-0 self-center px-2 text-[12px] leading-snug text-fg-dim">{running ? 'Истории появятся здесь.' : 'Историй нет.'}</span>}
+        <span className="mt-auto px-2 pt-3 font-mono text-[10.5px] text-fg-dim/70 max-lg:hidden">↑ ↓ — соседняя история</span>
       </nav>
 
-      <div className="min-h-0 overflow-auto p-5" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+      <div className="min-h-0 overflow-auto overscroll-contain p-3 sm:p-5" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
         <div key={current.key} className={`min-w-[900px] ${instant ? '' : 'fx-fade'}`}>
           <LaneView
             lane={current}

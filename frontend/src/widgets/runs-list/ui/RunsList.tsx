@@ -14,7 +14,7 @@ const originLabel = (run: RunRecord) => {
   return run.origin
 }
 
-const COLUMNS = 'grid grid-cols-[124px_minmax(0,1fr)_150px_repeat(4,60px)_140px]'
+const COLUMNS = 'grid-cols-[124px_minmax(0,1fr)_150px_repeat(4,60px)_140px]'
 const HEADERS = ['Время', 'Эпик', 'Статус', 'REQ', 'US', 'TASK', 'GAP', 'Модель']
 
 export function RunsList() {
@@ -33,7 +33,7 @@ export function RunsList() {
 
   return (
     <div className="h-full overflow-y-auto bg-ink">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-6 pb-5 sm:px-8 sm:pt-7 sm:pb-6">
         <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
           Запуски агента
         </h1>
@@ -42,17 +42,66 @@ export function RunsList() {
         </p>
       </header>
 
-      <div className="px-8 pb-8">
+      <div className="px-4 pb-6 sm:px-8 sm:pb-8">
         <section
           aria-label="Журнал запусков"
           className="overflow-x-auto rounded-[28px] border border-line bg-surface shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
         >
-          <div className="flex items-baseline justify-between gap-4 px-6 pt-6 pb-4">
+          <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <h2 className="font-display text-[19px] font-semibold text-fg">Журнал</h2>
             <span className="font-mono text-[12px] text-fg-dim">{runs ? `${runs.length} шт.` : 'загрузка…'}</span>
           </div>
 
-          <div className={`${COLUMNS} min-w-[860px] px-3 pb-3`}>
+          <ul className="m-0 flex list-none flex-col gap-1 px-2 pb-3 md:hidden">
+            {runs === null &&
+              [0, 1, 2].map((i) => (
+                <li key={i} className="px-1 py-1">
+                  <div className="h-24 animate-pulse rounded-2xl bg-panel" />
+                </li>
+              ))}
+            {runs?.map((run, i) => {
+              const status = STATUS_LABEL[run.status]
+              const stats = [
+                ['REQ', run.stats?.requirements_count],
+                ['US', run.stats?.stories_count],
+                ['TASK', run.stats?.tasks_count],
+                ['GAP', run.stats?.gaps_count],
+              ] as const
+              return (
+                <li key={run.id}>
+                  <a
+                    href={routeHref({ name: 'run', id: run.id })}
+                    className="fx-enter press flex flex-col gap-2 rounded-2xl border border-line bg-ink/40 px-4 py-3.5 active:bg-panel"
+                    style={{ animationDelay: `${Math.min(i, 12) * 30}ms` }}
+                  >
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-[12px] whitespace-nowrap text-fg-dim">{formatTime(run.created_at)}</span>
+                      <span className={`inline-flex shrink-0 items-center gap-2 rounded-full border border-current/30 px-2.5 py-0.5 text-[12px] font-semibold ${status.cls}`}>
+                        <span className={`size-1.5 rounded-full ${status.dot}`} />
+                        {status.text}
+                      </span>
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="line-clamp-2 text-[15px] leading-snug font-semibold text-fg">{run.title}</span>
+                      <span className="truncate font-mono text-[11px] text-fg-dim">
+                        {originLabel(run)}
+                        {run.model ? ` · ${run.model}` : ''}
+                      </span>
+                    </span>
+                    <span className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[12px] tabular-nums">
+                      {stats.map(([label, v]) => (
+                        <span key={label} className="text-fg-dim">
+                          {label} <b className={`font-medium ${v == null ? 'text-fg-dim/50' : 'text-fg-soft'}`}>{v ?? '—'}</b>
+                        </span>
+                      ))}
+                    </span>
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className={`${COLUMNS} hidden min-w-[860px] px-3 pb-3 md:grid`}>
             {HEADERS.map((h, i) => (
               <div
                 key={h}
