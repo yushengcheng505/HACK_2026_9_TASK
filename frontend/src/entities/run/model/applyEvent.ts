@@ -456,8 +456,8 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         ),
       }
     }
-    case 'run_finished':
-      return {
+    case 'run_finished': {
+      const finished: RunView = {
         ...next,
         status: 'done',
         activeNode: null,
@@ -467,6 +467,8 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
         coverage: (d.coverage as Coverage) ?? view.coverage,
         log: pushLog(view, line(e, 'Декомпозиция собрана', 'brand')),
       }
+      return view.result ? withResult(finished, view.result) : finished
+    }
     case 'run_failed':
       return {
         ...next,
@@ -490,8 +492,13 @@ export function applyEvent(view: RunView, e: RunEvent): RunView {
   }
 }
 
-/** Полный результат с бэкенда — источник истины после завершения или правок. */
-export function withResult(view: RunView, result: Decomposition): RunView {
+/**
+ * Полный результат с бэкенда — источник истины после завершения или правок. Пока поток событий не дочитан
+ * до конца, результат только запоминается и подставляется по run_finished: иначе догоняющие события
+ * добавили бы те же истории, требования и пробелы второй раз.
+ */
+export function withResult(view: RunView, result: Decomposition, streamEnded = false): RunView {
+  if (!streamEnded && view.status !== 'done' && view.status !== 'failed') return { ...view, result }
   return {
     ...view,
     result,
