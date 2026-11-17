@@ -14,8 +14,9 @@
 
 ## Трейлер
 
-> **Здесь будет трейлер SYNAPS.**  
-> Скоро покажем проект в действии.
+[![Кадр из трейлера SYNAPS — нажмите, чтобы открыть видео](media/synaps-demo-preview.jpg)](media/synaps-demo.mp4?raw=true)
+
+[Смотреть трейлер](media/synaps-demo.mp4?raw=true) · 1:06 · MP4, 1080p · 9,82 МБ
 
 ---
 
