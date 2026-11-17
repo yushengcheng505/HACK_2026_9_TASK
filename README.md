@@ -14,9 +14,9 @@
 
 ## Трейлер
 
-[![Кадр из трейлера SYNAPS — нажмите, чтобы открыть видео](media/synaps-demo-preview.jpg)](media/synaps-demo.mp4?raw=true)
+https://github.com/user-attachments/assets/b0a6a536-35d2-4882-8e11-ae78a936128a
 
-[Смотреть трейлер](media/synaps-demo.mp4?raw=true) · 1:06 · MP4, 1080p · 9,82 МБ
+[Скачать MP4](media/synaps-demo.mp4?raw=true) · 1:06 · 1080p · 9,82 МБ
 
 ---
 
