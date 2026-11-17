@@ -13,7 +13,6 @@
 | Лаборатория | `backend/app/lab.py`, промпт `backend/prompts/lab.md`, экран `frontend/src/widgets/lab-panel` |
 | Эталоны аналитика | `demo/*/reference.md`, заложенные в них ошибки — `demo/REFERENCES.md` |
 | Развёртывание | `deploy/` (compose, HAProxy, nginx), раздел «Запуск в Docker» в `backend/README.md` |
-| План, по которому делали | `docs/superpowers/plans/2026-11-15-jira-webhook-lab-deploy.md` |
 
 ## Стенд
 

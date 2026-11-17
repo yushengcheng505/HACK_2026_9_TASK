@@ -65,8 +65,8 @@ uv run python -m bench report --out bench/results/<метка>                  
 ```
 Дефекты внедряются в итоговые результаты прогонов из `data/app.db` (`bench/mutations.py`),
 готовые прогоны при перезапуске не повторяются, сорванные провайдером (429, 5xx, обрыв) —
-не сохраняются. Результаты и выводы: `bench/results/2026-11-14*/report.md`. Детали — в плане
-`../docs/superpowers/plans/2026-11-14-review-workflow.md`.
+не сохраняются. Результаты и выводы: `bench/results/2026-11-14*/report.md`.
+Методика и сравнение вариантов — в [отчёте исследования](../docs/review-benchmark.md).
 
 ## Быстрая проверка
 ```bash
