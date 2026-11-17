@@ -19,6 +19,34 @@
     height: 100%;
   }
 
+  #root {
+    height: 100dvh;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior: none;
+  }
+
+  :is(button, a, [role='button'], summary, label) {
+    touch-action: manipulation;
+  }
+
+  /* iOS приближает страницу при фокусе на поле мельче 16px; долгое нажатие не выделяет подпись кнопки */
+  @media (pointer: coarse) {
+    button,
+    [role='button'] {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    :is(input, textarea, select) {
+      font-size: 16px !important;
+    }
+  }
+
   body {
     color: var(--color-fg);
     font-family: var(--font-sans);
@@ -120,6 +148,97 @@
     box-shadow:
       0 0 0 1px rgb(255 90 78 / 0.7),
       0 0 18px rgb(255 90 78 / 0.2);
+  }
+}
+
+/* ---------- оболочка на телефоне: верхняя панель и выезжающее меню ---------- */
+
+.cs-topbar {
+  min-height: calc(60px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+@media (width < 64rem) {
+  .cs-drawer {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(300px, 86vw);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    box-shadow: 24px 0 60px -20px rgb(0 0 0 / 0.9);
+    transform: translateX(-104%);
+    visibility: hidden;
+    transition:
+      transform 280ms var(--ease-out-strong),
+      visibility 0s linear 280ms;
+  }
+
+  .cs-drawer-on {
+    transform: none;
+    visibility: visible;
+    transition: transform 320ms var(--ease-out-strong);
+  }
+
+  .cs-scrim {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 240ms ease;
+  }
+
+  .cs-scrim-on {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Лента, которая листается вбок: правый край гаснет — видно, что дальше есть ещё */
+@media (width < 64rem) {
+  .scroll-fade {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+}
+
+/* Инспектор пульта на телефоне: шторка снизу, появляется при выборе узла или этапа */
+@media (width < 64rem) {
+  .ins-sheet {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 45;
+    max-height: min(70dvh, 620px);
+    border-left: 0;
+    border-radius: 20px 20px 0 0;
+    background: var(--color-surface);
+    box-shadow:
+      0 0 0 1px var(--color-line),
+      0 -24px 60px -20px rgb(0 0 0 / 0.9);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateY(105%);
+    visibility: hidden;
+    transition:
+      transform 280ms var(--ease-out-strong),
+      visibility 0s linear 280ms;
+  }
+
+  .ins-sheet::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: 2px;
+    background: var(--color-line-strong);
+  }
+
+  .ins-sheet-on {
+    transform: none;
+    visibility: visible;
+    transition: transform 320ms var(--ease-out-strong);
   }
 }
 
@@ -250,6 +369,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cs-drawer,
+  .cs-drawer-on,
+  .cs-scrim,
+  .ins-sheet,
+  .ins-sheet-on {
+    transition: none;
+  }
+
   .fx-enter,
   .fx-retire {
     animation-duration: 1ms;

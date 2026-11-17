@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RunView } from '@/entities/run'
 import { buildInstances } from '../model/agents'
 import type { ParticleApi } from '../model/particles'
@@ -20,6 +20,12 @@ interface AgentFlowProps {
 /** Граф агентов прогона: подготовка кодом → декомпозиция → ОТК → проверка → скептик, справа — инспектор агента. */
 export function AgentFlow({ view, replay, speed, onReplay }: AgentFlowProps) {
   const [selected, setSelected] = useState<string | null>(null)
+  /** На узком экране инспектор — нижняя шторка: выбор агента раскрывает её. */
+  const [sheet, setSheet] = useState(false)
+  const select = useCallback((key: string | null) => {
+    setSelected(key)
+    if (key) setSheet(true)
+  }, [])
   const [armed, setArmed] = useState(false)
   const particles = useRef<ParticleApi>(null)
   const running = view.status === 'running' || view.status === 'waiting_answers'
@@ -43,14 +49,19 @@ export function AgentFlow({ view, replay, speed, onReplay }: AgentFlowProps) {
   }, [])
 
   return (
-    <div className="af-root grid h-full grid-cols-[minmax(0,1fr)_minmax(360px,420px)] grid-rows-[auto_auto_minmax(0,1fr)]">
-      <div className="col-span-2">
+    <div className="af-root grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
+      <div className="lg:col-span-2">
         <FlowHeader view={view} mode="agents" replay={replay} speed={speed} onReplay={onReplay} />
       </div>
-      <PrepStrip view={view} selected={selected === 'prep'} onSelect={() => setSelected('prep')} />
-      <FlowCanvas view={view} instances={instances} selected={selected} onSelect={setSelected} particles={particles} live={live} />
-      <div className="col-start-2 row-span-2 row-start-2 flex min-h-0 min-w-0">
-        <Inspector view={view} instances={instances} selected={selected} onSelect={setSelected} now={now} />
+      <PrepStrip view={view} selected={selected === 'prep'} onSelect={() => select('prep')} />
+      <FlowCanvas view={view} instances={instances} selected={selected} onSelect={select} particles={particles} live={live} />
+      <div className={`af-side ${sheet ? 'af-side-open' : ''} flex min-h-0 min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-2`}>
+        <button type="button" className="af-sheet-handle" onClick={() => setSheet(!sheet)} aria-expanded={sheet}>
+          <i aria-hidden="true" />
+          <span>{selected ? 'Агент' : 'Кто сейчас работает'}</span>
+          <span>{sheet ? 'свернуть ↓' : 'открыть ↑'}</span>
+        </button>
+        <Inspector view={view} instances={instances} selected={selected} onSelect={select} now={now} />
       </div>
     </div>
   )

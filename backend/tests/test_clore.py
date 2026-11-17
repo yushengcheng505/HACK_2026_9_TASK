@@ -75,6 +75,7 @@ def test_launch_payload_is_explicit_script_and_redacted(clore):
     assert p["command"].startswith("cd /app && nohup ./llama-server ")
     assert p["command"].endswith("> /root/llama.log 2>&1 &")
     assert "--reasoning-budget 0" in p["command"]
+    assert "--dry-multiplier 0.8" in p["command"]
     assert "--no-mmproj" in p["command"]
     assert "-hf unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M" in p["command"]
     assert "private-key" not in json.dumps(clore.redact(p))

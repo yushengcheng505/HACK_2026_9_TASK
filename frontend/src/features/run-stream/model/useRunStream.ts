@@ -23,10 +23,10 @@ export function useRunStream(runId: string) {
   const queue = useRef<RunEvent[]>([])
   const frame = useRef(0)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (streamEnded = false) => {
     const run = await api.get<RunRecord>(`/runs/${runId}`)
     setView((v) => {
-      let base = run.result ? withResult(v, run.result) : v
+      let base = run.result ? withResult(v, run.result, streamEnded) : v
       if (!replay) {
         const terminal = run.status === 'done' || run.status === 'failed'
         base = {
@@ -75,7 +75,7 @@ export function useRunStream(runId: string) {
         if (run.status === 'done' || run.status === 'failed' || replay) {
           closed = true
           source.close()
-          void refresh()
+          void refresh(true)
         }
       })
     }

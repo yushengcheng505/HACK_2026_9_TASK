@@ -67,8 +67,8 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
   }, [])
 
   const errors = view.issues.filter((i) => i.severity === 'error').length
-  const tabs: { id: Tab; label: string; badge?: string; tone?: string }[] = [
-    { id: 'map', label: 'Трассировочная карта' },
+  const tabs: { id: Tab; label: string; short?: string; badge?: string; tone?: string }[] = [
+    { id: 'map', label: 'Трассировочная карта', short: 'Карта' },
     { id: 'table', label: 'Таблица', badge: String(view.stories.reduce((n, s) => n + s.tasks.length, 0)) },
     { id: 'qc', label: 'ОТК', badge: view.coverage ? String(view.issues.length) : undefined, tone: errors ? 'text-hazard' : 'text-fg-dim' },
     { id: 'gaps', label: 'Пробелы', badge: String(view.gaps.length), tone: view.gaps.length ? 'text-hazard' : 'text-fg-dim' },
@@ -84,13 +84,13 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
   }
 
   return (
-    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto]">
+    <div className="grid h-full grid-cols-[minmax(0,1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto] pb-[env(safe-area-inset-bottom)]">
       <FlowHeader view={view} mode="pult" replay={replay} speed={speed} onReplay={startReplay} />
       <RunProgress view={view} selected={stage} onSelect={showStage} />
 
-      <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+      <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
         <div className="relative flex min-h-0 min-w-0 flex-col">
-          <div role="tablist" className="flex shrink-0 items-stretch gap-px border-b border-line bg-ink/90 px-4">
+          <div role="tablist" className="flex shrink-0 items-stretch gap-px overflow-x-auto overscroll-x-contain border-b border-line bg-ink px-1 [scrollbar-width:none] sm:px-4 lg:bg-ink/90">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -98,11 +98,18 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
                 type="button"
                 aria-selected={tab === t.id}
                 onClick={() => setTab(t.id)}
-                className={`press relative flex cursor-pointer items-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold ${
+                className={`press relative flex shrink-0 cursor-pointer items-center justify-center gap-2 px-3.5 py-2.5 text-[13px] font-semibold whitespace-nowrap max-lg:flex-1 max-lg:px-2 ${
                   tab === t.id ? 'text-fg' : 'text-fg-dim hover:text-fg-soft'
                 }`}
               >
-                {t.label}
+                {t.short ? (
+                  <>
+                    <span className="lg:hidden">{t.short}</span>
+                    <span className="max-lg:hidden">{t.label}</span>
+                  </>
+                ) : (
+                  t.label
+                )}
                 {t.badge !== undefined && <span className={`font-mono text-[11px] ${t.tone ?? 'text-fg-dim'}`}>{t.badge}</span>}
                 <span
                   className={`absolute inset-x-2 -bottom-px h-[2px] bg-brand transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] ${
@@ -112,23 +119,25 @@ export function RunWorkspace({ runId, mode }: RunWorkspaceProps) {
               </button>
             ))}
             {view.status === 'failed' && (
-              <span className="tag ml-auto self-center truncate text-hazard" title={view.error ?? ''}>
+              <span className="tag ml-auto max-w-[60vw] shrink-0 self-center truncate text-hazard" title={view.error ?? ''}>
                 сбой: {view.error}
               </span>
             )}
             {tab === 'map' && (
-              <div className="af-seg ml-auto self-center" role="group" aria-label="Вид карты">
-                {MAP_VIEWS.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setMapView(v.id)}
-                    aria-pressed={mapView === v.id}
-                    className={`af-seg-item ${mapView === v.id ? 'af-seg-on' : ''}`}
-                  >
-                    {v.label}
-                  </button>
-                ))}
+              <div className="ml-auto shrink-0 self-center max-lg:hidden">
+                <div className="af-seg" role="group" aria-label="Вид карты">
+                  {MAP_VIEWS.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setMapView(v.id)}
+                      aria-pressed={mapView === v.id}
+                      className={`af-seg-item ${mapView === v.id ? 'af-seg-on' : ''}`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

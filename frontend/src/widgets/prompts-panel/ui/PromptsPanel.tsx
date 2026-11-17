@@ -83,7 +83,7 @@ export function PromptsPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-ink lg:overflow-hidden">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-6 pb-5 sm:px-8 sm:pt-7 sm:pb-6">
         <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
           Системные промпты.
           <br />
@@ -101,9 +101,9 @@ export function PromptsPanel() {
         </div>
       </header>
 
-      <div className="grid gap-6 px-8 pb-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:gap-6 px-4 pb-6 sm:px-8 sm:pb-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className={`${cardClass} flex flex-col overflow-hidden lg:min-h-0`} aria-labelledby="roles-title">
-          <div className="flex items-baseline justify-between gap-4 px-6 pt-6 pb-4">
+          <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <h2 id="roles-title" className="font-display text-[19px] font-semibold text-fg">
               Роли
             </h2>
@@ -142,7 +142,7 @@ export function PromptsPanel() {
         </section>
 
         {current ? (
-          <section className={`${cardClass} flex min-h-[560px] flex-col gap-4 p-6 lg:min-h-0`} aria-labelledby="prompt-title">
+          <section className={`${cardClass} flex min-h-[560px] flex-col gap-4 p-5 sm:p-6 lg:min-h-0`} aria-labelledby="prompt-title">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
               <RoleMark name={current.name} size={48} state={busy ? 'working' : 'waiting'} />
               <div className="flex min-w-0 flex-col gap-0.5">

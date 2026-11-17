@@ -7,5 +7,8 @@ __pycache__/
 .langgraph_api/
 data/
 tests/
-bench/results/
+# Сырые замеры не нужны, отчёты report.md остаются — их показывает раздел «Бенчмарк».
+bench/results/**/*.json
+bench/results/**/*.running
+bench/results/**/_prompts/
 *.log

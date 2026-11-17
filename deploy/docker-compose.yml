@@ -23,6 +23,7 @@ services:
       DEMO_DIR: /demo
     volumes:
       - ../demo:/demo:ro
+      - ../docs/review-benchmark.md:/docs/review-benchmark.md:ro
       - backend-data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"

@@ -71,7 +71,7 @@ export function LaunchPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-ink xl:overflow-hidden">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-8 pt-7 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pt-6 pb-5 sm:px-8 sm:pt-7 sm:pb-6">
         <h1 className="m-0 font-display text-[clamp(26px,2.6vw,40px)] leading-[1.12] font-semibold tracking-[-0.01em]">
           Новый эпик.
           <br />
@@ -80,14 +80,14 @@ export function LaunchPanel() {
       </header>
 
       {error && (
-        <div className="mx-8 mb-5 rounded-2xl border border-hazard/60 bg-hazard-deep/40 px-4 py-3 font-mono text-[13px] text-hazard">
+        <div className="mx-4 mb-5 sm:mx-8 rounded-2xl border border-hazard/60 bg-hazard-deep/40 px-4 py-3 font-mono text-[13px] text-hazard">
           {error}
         </div>
       )}
 
-      <div className="grid gap-6 px-8 pb-8 xl:min-h-0 xl:flex-1 xl:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 px-4 pb-6 sm:px-8 sm:pb-8 xl:min-h-0 xl:flex-1 xl:grid-cols-2">
         <section className={`${cardClass} overflow-hidden xl:min-h-0`} aria-labelledby="custom-title">
-          <div className="h-full p-6 xl:overflow-y-auto">
+          <div className="h-full p-5 sm:p-6 xl:overflow-y-auto">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
               <h2 id="custom-title" className="font-display text-[19px] font-semibold text-fg">
                 Задача для команды
@@ -108,14 +108,14 @@ export function LaunchPanel() {
         </section>
 
         <section className={`${cardClass} flex flex-col overflow-hidden xl:min-h-0`} aria-labelledby="templates-title">
-          <div className="flex items-baseline justify-between gap-4 px-6 pt-6 pb-4">
+          <div className="flex items-baseline justify-between gap-4 px-5 pt-5 pb-4 sm:px-6 sm:pt-6">
             <h2 id="templates-title" className="font-display text-[19px] font-semibold text-fg">
               Шаблоны эпиков
             </h2>
             <span className="font-mono text-[12px] text-fg-dim">{demos === null ? '…' : `${templates.length} шт.`}</span>
           </div>
           <div className="relative flex min-h-0 flex-1 flex-col">
-            <div className="flex max-h-[720px] flex-col gap-4 overflow-y-auto px-6 pb-8 xl:max-h-none xl:flex-1">
+            <div className="flex max-h-[720px] flex-col gap-4 overflow-y-auto px-4 pb-6 max-sm:max-h-none max-sm:overflow-visible sm:px-6 sm:pb-8 xl:max-h-none xl:flex-1">
               {demos === null && <div className="h-64 shrink-0 animate-pulse rounded-[22px] border border-line bg-panel" />}
               {templates.map(({ template, demo }) => (
                 <TemplateCard
@@ -131,7 +131,7 @@ export function LaunchPanel() {
                 />
               ))}
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b-[28px] bg-linear-to-t from-surface to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b-[28px] bg-linear-to-t from-surface to-transparent max-sm:hidden" />
           </div>
         </section>
       </div>

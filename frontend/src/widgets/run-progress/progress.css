@@ -304,3 +304,37 @@
     transform: none;
   }
 }
+
+/* Телефон: шесть плашек сеткой 3×2 без прокрутки; рельс, петля и значки — в инспекторе по тапу */
+@media (width < 64rem) {
+  .rp {
+    padding: 10px 12px;
+  }
+  .rp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .rp-rail,
+  .rp-loop,
+  .rp-badge,
+  .rp-pop {
+    display: none;
+  }
+  .rp-tile {
+    gap: 4px;
+    padding: 7px 10px 8px;
+    border-radius: 10px;
+  }
+  .rp-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+  }
+  .rp-value {
+    font-size: 17px;
+  }
+  .rp-unit {
+    margin-left: 4px;
+    font-size: 10.5px;
+  }
+}

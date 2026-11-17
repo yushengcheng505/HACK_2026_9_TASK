@@ -183,14 +183,76 @@ async def test_publish_truncates_jira_fields(decomposition):
     assert len(jira.issues["KAN-1"]["description"]) == 30000
 
 
-async def test_network_error_is_wrapped(decomposition):
+async def test_network_error_is_wrapped(decomposition, no_sleep):
     def handler(request):
         raise httpx.ConnectError("connection failed", request=request)
 
     client = JiraTracker("https://jira.test", "user@test", "secret-token", "KAN",
                          transport=httpx.MockTransport(handler))
-    with pytest.raises(TrackerError, match="Jira"):
+    with pytest.raises(TrackerError, match="ConnectError"):
         await client.publish(decomposition)
+
+
+@pytest.fixture
+def no_sleep(monkeypatch):
+    waits = []
+
+    async def sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr("app.tracker.asyncio.sleep", sleep)
+    return waits
+
+
+def flaky(jira, fail):
+    """Первый запрос, на котором fail(request) вернёт исключение или ответ, падает один раз."""
+    state = {"failed": False}
+
+    def handler(request):
+        if not state["failed"]:
+            outcome = fail(request)
+            if outcome is not None:
+                state["failed"] = True
+                if isinstance(outcome, Exception):
+                    raise outcome
+                return outcome
+        return jira.handler(request)
+
+    return handler
+
+
+async def test_transient_network_error_is_retried(decomposition, no_sleep):
+    jira = FakeJira()
+    handler = flaky(jira, lambda r: httpx.ReadTimeout("timed out", request=r) if r.method == "PUT" else None)
+    client = JiraTracker("https://jira.test", "user@test", "secret-token", "KAN", transport=httpx.MockTransport(handler))
+    await tracker(jira).publish(decomposition)
+    result = await client.publish(decomposition)
+    assert (result.created, result.updated) == (0, 7)
+    assert no_sleep
+
+
+async def test_create_is_retried_only_when_request_was_not_sent(decomposition, no_sleep):
+    jira = FakeJira()
+    handler = flaky(jira, lambda r: httpx.ConnectError("refused", request=r) if r.method == "POST" else None)
+    client = JiraTracker("https://jira.test", "user@test", "secret-token", "KAN", transport=httpx.MockTransport(handler))
+    result = await client.publish(decomposition)
+    assert result.created == 7 and len(jira.issues) == 7
+
+    jira = FakeJira()
+    handler = flaky(jira, lambda r: httpx.ReadTimeout("timed out", request=r) if r.method == "POST" else None)
+    client = JiraTracker("https://jira.test", "user@test", "secret-token", "KAN", transport=httpx.MockTransport(handler))
+    with pytest.raises(TrackerError, match="ReadTimeout") as exc:
+        await client.publish(decomposition)
+    assert "повторите публикацию" in str(exc.value)
+    assert len(jira.issues) == 0
+
+
+async def test_rate_limit_and_unavailable_are_retried(decomposition, no_sleep):
+    jira = FakeJira()
+    handler = flaky(jira, lambda r: httpx.Response(429, headers={"Retry-After": "3"}) if r.method == "POST" else None)
+    client = JiraTracker("https://jira.test", "user@test", "secret-token", "KAN", transport=httpx.MockTransport(handler))
+    assert (await client.publish(decomposition)).created == 7
+    assert 3 in no_sleep
 
 
 def test_tracker_from_settings_requires_all_fields():

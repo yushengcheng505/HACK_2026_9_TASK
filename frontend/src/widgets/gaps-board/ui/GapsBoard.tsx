@@ -2,7 +2,7 @@ import type { RunView } from '@/entities/run'
 
 export function GapsBoard({ view, onShow }: { view: RunView; onShow: (gapId: string) => void }) {
   return (
-    <div className="h-full overflow-y-auto px-6 py-5">
+    <div className="h-full overflow-y-auto px-4 py-5 sm:px-6">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-[14px] font-semibold text-fg">
@@ -55,16 +55,16 @@ export function GapsBoard({ view, onShow }: { view: RunView; onShow: (gapId: str
           <span className="text-[14px] font-semibold text-fg">Вопросы аналитика и допущения</span>
           <div className="mt-3 flex flex-col gap-px overflow-hidden rounded-xl border border-line bg-line">
             {view.questions.map((q) => (
-              <div key={q.id} className="grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)] gap-4 bg-ink px-4 py-3">
+              <div key={q.id} className="grid grid-cols-[52px_minmax(0,1fr)] gap-x-3 gap-y-1 sm:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)] sm:gap-4 bg-ink px-4 py-3">
                 <span className="font-mono text-[12px] font-bold text-amber">{q.id}</span>
                 <span className="text-[13px] leading-snug text-fg-soft">{q.text}</span>
-                <span className={`text-[13px] leading-snug ${q.answer ? 'text-brand' : 'text-fg-dim'}`}>
+                <span className={`text-[13px] leading-snug max-sm:col-start-2 ${q.answer ? 'text-brand' : 'text-fg-dim'}`}>
                   {q.answer ?? `без ответа → ${q.options[q.recommended] ?? '—'}`}
                 </span>
               </div>
             ))}
             {view.assumptions.map((a) => (
-              <div key={a} className="grid grid-cols-[64px_minmax(0,1fr)] gap-4 bg-ink px-4 py-3">
+              <div key={a} className="grid grid-cols-[52px_minmax(0,1fr)] gap-3 sm:grid-cols-[64px_minmax(0,1fr)] sm:gap-4 bg-ink px-4 py-3">
                 <span className="tag text-[10px] text-fg-dim">допущ.</span>
                 <span className="text-[13px] leading-snug text-fg-muted">{a}</span>
               </div>

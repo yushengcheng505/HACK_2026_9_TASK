@@ -49,7 +49,7 @@ export function PrepStrip({ view, selected, onSelect }: PrepStripProps) {
 
   return (
     <section className="af-prep col-start-1 row-start-2 flex items-stretch gap-3 px-5 py-3" aria-label="Подготовка без агентов">
-      <div className="flex w-[148px] shrink-0 flex-col justify-center">
+      <div className="af-prep-intro flex w-[148px] shrink-0 flex-col justify-center">
         <span className="font-mono text-[10.5px] tracking-[0.16em] text-brand-mid uppercase">00 · Подготовка</span>
         <span className="mt-1 text-[12px] leading-snug text-fg-dim">код, без LLM: разбор входов перед конвейером</span>
       </div>

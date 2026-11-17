@@ -26,8 +26,8 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
   return (
     <div className="h-full overflow-y-auto">
       <div className="grid gap-px bg-line xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <section className="bg-ink px-6 py-5">
-          <div className="mb-4 flex items-start justify-between gap-6">
+        <section className="bg-ink px-4 py-5 sm:px-6">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-4 sm:flex-nowrap sm:gap-6">
             <div className="flex flex-col gap-1.5">
               <span className="text-[14px] font-semibold text-fg">Покрытие контракта</span>
               <p className="max-w-[420px] text-[13px] leading-relaxed text-fg-muted">
@@ -42,9 +42,9 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
               <div className="mt-1 font-mono text-[10.5px]">{errors ? `ошибок: ${errors}` : `покрытие ${view.coverage.coverage_percent}%`}</div>
             </div>
           </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_110px_70px_70px] gap-px overflow-hidden rounded-xl border border-line bg-line">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:grid-cols-[minmax(0,1fr)_110px_70px_70px] gap-px overflow-hidden rounded-xl border border-line bg-line">
             {['Операция', 'Статус', 'Задач', 'Тестов'].map((h) => (
-              <div key={h} className="tag bg-surface px-3 py-2 text-fg-dim">{h}</div>
+              <div key={h} className="tag truncate bg-surface px-2 py-2 text-fg-dim sm:px-3">{h}</div>
             ))}
             {ops.map((op) => {
               const status = STATUS[contractOpStatus(view, op.id)]
@@ -58,13 +58,13 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
                   onClick={() => onSelect(nodeKey('source', op.id))}
                   className="press col-span-full grid cursor-pointer grid-cols-subgrid bg-ink text-left hover:bg-surface"
                 >
-                  <span className="min-w-0 px-3 py-2.5">
+                  <span className="min-w-0 px-2 py-2.5 sm:px-3">
                     <span className="block truncate font-mono text-[12.5px] font-bold text-fg">{short.name}</span>
                     <span className="block truncate font-mono text-[10.5px] text-fg-dim">{short.scope}</span>
                   </span>
-                  <span className={`tag self-center px-3 ${status.cls}`}>{status.text}</span>
-                  <span className="self-center px-3 text-right font-mono text-[13px] text-fg-soft tabular-nums">{using.length}</span>
-                  <span className={`self-center px-3 text-right font-mono text-[13px] tabular-nums ${tests.length ? 'text-fg-soft' : 'text-fg-dim'}`}>
+                  <span className={`tag self-center px-2 sm:px-3 ${status.cls}`}>{status.text}</span>
+                  <span className="self-center px-2 text-right font-mono sm:px-3 text-[13px] text-fg-soft tabular-nums">{using.length}</span>
+                  <span className={`self-center px-2 text-right font-mono text-[13px] tabular-nums sm:px-3 ${tests.length ? 'text-fg-soft' : 'text-fg-dim'}`}>
                     {tests.length}
                   </span>
                 </button>
@@ -73,7 +73,7 @@ export function QcReport({ view, onSelect }: { view: RunView; onSelect: (key: st
           </div>
         </section>
 
-        <section className="bg-ink px-6 py-5">
+        <section className="bg-ink px-4 py-5 sm:px-6">
           <div className="mb-4 flex items-baseline gap-2">
             <span className="text-[14px] font-semibold text-fg">Замечания проверок</span>
             <span className="font-mono text-[11px] text-fg-dim">{view.issues.length}</span>
